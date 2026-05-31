@@ -1,0 +1,7 @@
+agent:
+  name: "Secrets Hygiene Monitor"
+  tools:
+    - name: "github_scan"
+      enabled: true
+    - name: "slack_alert"
+      enabled: true

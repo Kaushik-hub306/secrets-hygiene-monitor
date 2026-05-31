@@ -1,1 +1,6 @@
-# Core Dependencies\npython-dotenv==1.0.0\nrequests==2.31.0\nPyGithub==2.1.1\nboto3==1.28.0\nbotocore==1.31.0\n\n# Secret Detection\ntruffleHog==3.63.0\ndetect-secrets==1.4.0\n\n# Data Processing\npandas==2.0.0\n\n# API & Web\nfastapi==0.104.0\nuvicorn==0.24.0\npydantic==2.0.0\n\n# Monitoring & Logging\nloguru==0.7.0\nwatchtower==3.0.0\n\n# AWS\naws-lambda-powertools==2.35.0\npynamodb==5.4.0\n\n# Testing\npytest==7.4.0\npytest-cov==4.1.0\nmoto==4.2.0\n\n# Security\ncryptography==41.0.0\nPyJWT==2.8.0\n\n# Utilities\nclick==8.1.0\ncolorama==0.4.6\ntqdm==4.66.0\n
+python-dotenv==1.0.0
+requests==2.31.0
+PyGithub==2.1.1
+boto3==1.28.0
+loguru==0.7.0
+pytest==7.4.0

@@ -22,4 +22,165 @@ class SecretType(Enum):
     GENERIC_SECRET = "High Entropy String"
     HEROKU_API_KEY = "Heroku API Key"
     TWILIO_API_KEY = "Twilio API Key"
-    PRIVATE_KEY = "Private Key"\n\n\nclass Patterns:\n    \"\"\"Regex patterns for secret detection.\"\"\"\n\n    # AWS\n    AWS_ACCESS_KEY = re.compile(r\"AKIA[0-9A-Z]{16}\")\n    AWS_SECRET_KEY = re.compile(\n        r\"(?i)aws_secret_access_key\\s*[=:]\\s*['\\\"]?([A-Za-z0-9/+=]{40})['\\\"]?\"\n    )\n\n    # GitHub\n    GITHUB_PAT = re.compile(r\"ghp_[0-9a-zA-Z]{36}\")\n    GITHUB_OAUTH = re.compile(r\"gho_[0-9a-zA-Z]{36}\")\n    GITHUB_APP_TOKEN = re.compile(r\"ghu_[0-9a-zA-Z]{36}\")\n    GITHUB_REFRESH_TOKEN = re.compile(r\"ghr_[0-9a-zA-Z]{36}\")\n\n    # Slack\n    SLACK_BOT_TOKEN = re.compile(r\"xoxb-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,26}\")\n    SLACK_USER_TOKEN = re.compile(r\"xoxp-[0-9]{10,13}-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{32}\")\n    SLACK_WEBHOOK = re.compile(r\"https://hooks\\.slack\\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{24}\")\n\n    # APIs\n    SENDGRID_API_KEY = re.compile(r\"SG\\.[a-zA-Z0-9_-]{22}\\.[a-zA-Z0-9_-]{43}\")\n    STRIPE_API_KEY = re.compile(r\"(?:sk_live|pk_live|rk_live)_[a-zA-Z0-9]{24,}\")\n    HEROKU_API_KEY = re.compile(r\"heroku_[a-z0-9]{36}\")\n    TWILIO_API_KEY = re.compile(r\"AC[a-zA-Z0-9]{32}\")\n\n    # Databases\n    MONGODB_URI = re.compile(\n        r\"mongodb(?:\\+srv)?://[a-zA-Z0-9_.-]+(?::[a-zA-Z0-9_.-]+)?@[a-zA-Z0-9.-]+(?::[0-9]+)?/[a-zA-Z0-9_.-]*\"\n    )\n\n    # Private Keys\n    RSA_PRIVATE_KEY = re.compile(\n        r\"-----BEGIN RSA PRIVATE KEY-----[^-]*-----END RSA PRIVATE KEY-----\",\n        re.DOTALL\n    )\n    OPENSSH_PRIVATE_KEY = re.compile(\n        r\"-----BEGIN OPENSSH PRIVATE KEY-----[^-]*-----END OPENSSH PRIVATE KEY-----\",\n        re.DOTALL\n    )\n\n    # JWT\n    JWT_TOKEN = re.compile(\n        r\"eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\"\n    )\n\n\nclass EntropyAnalyzer:\n    \"\"\"Analyze entropy of strings to detect likely secrets.\"\"\"\n\n    @staticmethod\n    def calculate_entropy(s: str) -> float:\n        \"\"\"Calculate Shannon entropy of a string.\"\"\"\n        if not s:\n            return 0.0\n        \n        entropy = 0.0\n        for char in set(s):\n            p = s.count(char) / len(s)\n            entropy -= p * math.log2(p)\n        return entropy\n\n    @staticmethod\n    def is_likely_secret(s: str, min_entropy: float = 3.5, min_length: int = 20) -> bool:\n        \"\"\"Check if string is likely a secret based on entropy.\"\"\"\n        if len(s) < min_length:\n            return False\n        \n        entropy = EntropyAnalyzer.calculate_entropy(s)\n        return entropy >= min_entropy\n\n    @staticmethod\n    def find_high_entropy_strings(text: str, min_entropy: float = 4.0) -> List[Tuple[str, float]]:\n        \"\"\"Find all high-entropy strings in text.\"\"\"\n        words = re.split(r'[\\s=:,;\\\"\\'\\\\'()/\\\\-_]+', text)\n        candidates = []\n        \n        for word in words:\n            if len(word) >= 20:\n                entropy = EntropyAnalyzer.calculate_entropy(word)\n                if entropy >= min_entropy:\n                    candidates.append((word, entropy))\n        \n        return sorted(candidates, key=lambda x: x[1], reverse=True)\n\n\nclass SecretMatcher:\n    \"\"\"Match strings against secret patterns.\"\"\"\n\n    PATTERN_MAP = [\n        (Patterns.AWS_ACCESS_KEY, SecretType.AWS_ACCESS_KEY),\n        (Patterns.AWS_SECRET_KEY, SecretType.AWS_SECRET_KEY),\n        (Patterns.GITHUB_PAT, SecretType.GITHUB_TOKEN),\n        (Patterns.GITHUB_OAUTH, SecretType.GITHUB_OAUTH),\n        (Patterns.SLACK_BOT_TOKEN, SecretType.SLACK_TOKEN),\n        (Patterns.SLACK_USER_TOKEN, SecretType.SLACK_TOKEN),\n        (Patterns.SLACK_WEBHOOK, SecretType.SLACK_TOKEN),\n        (Patterns.SENDGRID_API_KEY, SecretType.SENDGRID_API_KEY),\n        (Patterns.STRIPE_API_KEY, SecretType.STRIPE_API_KEY),\n        (Patterns.MONGODB_URI, SecretType.MONGODB_URI),\n        (Patterns.HEROKU_API_KEY, SecretType.HEROKU_API_KEY),\n        (Patterns.RSA_PRIVATE_KEY, SecretType.SSH_PRIVATE_KEY),\n        (Patterns.OPENSSH_PRIVATE_KEY, SecretType.SSH_PRIVATE_KEY),\n        (Patterns.JWT_TOKEN, SecretType.JWT_TOKEN),\n    ]\n\n    @staticmethod\n    def find_secrets(text: str) -> List[Dict]:\n        \"\"\"Find all secrets in text.\"\"\"\n        secrets = []\n        seen = set()\n\n        # Pattern matching\n        for pattern, secret_type in SecretMatcher.PATTERN_MAP:\n            matches = pattern.finditer(text)\n            for match in matches:\n                secret_value = match.group(0)\n                if secret_value not in seen:\n                    secrets.append({\n                        \"type\": secret_type.value,\n                        \"value\": secret_value[:50],  # Truncate for safety\n                        \"confidence\": \"HIGH\",\n                    })\n                    seen.add(secret_value)\n\n        # Entropy-based detection\n        high_entropy = EntropyAnalyzer.find_high_entropy_strings(text, min_entropy=4.0)\n        for entropy_string, entropy_score in high_entropy[:10]:\n            if entropy_string not in seen and len(entropy_string) >= 30:\n                secrets.append({\n                    \"type\": SecretType.GENERIC_SECRET.value,\n                    \"value\": entropy_string[:50],\n                    \"entropy\": round(entropy_score, 2),\n                    \"confidence\": \"MEDIUM\" if entropy_score < 5.0 else \"HIGH\",\n                })\n                seen.add(entropy_string)\n\n        return secrets\n\n    @staticmethod\n    def find_secret_files(path: str) -> List[str]:\n        \"\"\"Find files that likely contain secrets.\"\"\"\n        secret_filenames = [\n            r\"\\.env\",\n            r\"secrets?\\.\\w+\",\n            r\"config\\.\\w+\",\n            r\"credentials\\.\\w+\",\n            r\"keys?\\.\\w+\",\n            r\"\\.aws\",\n            r\"\\.ssh\",\n            r\"id_rsa\",\n        ]\n        \n        matches = []\n        for pattern in secret_filenames:\n            if re.search(pattern, path, re.IGNORECASE):\n                matches.append(pattern)\n        \n        return matches\n
+    PRIVATE_KEY = "Private Key"
+
+
+class Patterns:
+    """Regex patterns for secret detection."""
+
+    # AWS
+    AWS_ACCESS_KEY = re.compile(r"AKIA[0-9A-Z]{16}")
+    AWS_SECRET_KEY = re.compile(
+        r"(?i)aws_secret_access_key\s*[=:]\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?"
+    )
+
+    # GitHub
+    GITHUB_PAT = re.compile(r"ghp_[0-9a-zA-Z]{36}")
+    GITHUB_OAUTH = re.compile(r"gho_[0-9a-zA-Z]{36}")
+    GITHUB_APP_TOKEN = re.compile(r"ghu_[0-9a-zA-Z]{36}")
+    GITHUB_REFRESH_TOKEN = re.compile(r"ghr_[0-9a-zA-Z]{36}")
+
+    # Slack
+    SLACK_BOT_TOKEN = re.compile(r"xoxb-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,26}")
+    SLACK_USER_TOKEN = re.compile(r"xoxp-[0-9]{10,13}-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{32}")
+    SLACK_WEBHOOK = re.compile(r"https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{24}")
+
+    # APIs
+    SENDGRID_API_KEY = re.compile(r"SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}")
+    STRIPE_API_KEY = re.compile(r"(?:sk_live|pk_live|rk_live)_[a-zA-Z0-9]{24,}")
+    HEROKU_API_KEY = re.compile(r"heroku_[a-z0-9]{36}")
+    TWILIO_API_KEY = re.compile(r"AC[a-zA-Z0-9]{32}")
+
+    # Databases
+    MONGODB_URI = re.compile(
+        r"mongodb(?:\+srv)?://[a-zA-Z0-9_.-]+(?::[a-zA-Z0-9_.-]+)?@[a-zA-Z0-9.-]+(?::[0-9]+)?/[a-zA-Z0-9_.-]*"
+    )
+
+    # Private Keys
+    RSA_PRIVATE_KEY = re.compile(
+        r"-----BEGIN RSA PRIVATE KEY-----[^-]*-----END RSA PRIVATE KEY-----",
+        re.DOTALL
+    )
+    OPENSSH_PRIVATE_KEY = re.compile(
+        r"-----BEGIN OPENSSH PRIVATE KEY-----[^-]*-----END OPENSSH PRIVATE KEY-----",
+        re.DOTALL
+    )
+
+    # JWT
+    JWT_TOKEN = re.compile(
+        r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
+    )
+
+
+class EntropyAnalyzer:
+    """Analyze entropy of strings to detect likely secrets."""
+
+    @staticmethod
+    def calculate_entropy(s: str) -> float:
+        """Calculate Shannon entropy of a string."""
+        if not s:
+            return 0.0
+        
+        entropy = 0.0
+        for char in set(s):
+            p = s.count(char) / len(s)
+            entropy -= p * math.log2(p)
+        return entropy
+
+    @staticmethod
+    def is_likely_secret(s: str, min_entropy: float = 3.5, min_length: int = 20) -> bool:
+        """Check if string is likely a secret based on entropy."""
+        if len(s) < min_length:
+            return False
+        
+        entropy = EntropyAnalyzer.calculate_entropy(s)
+        return entropy >= min_entropy
+
+    @staticmethod
+    def find_high_entropy_strings(text: str, min_entropy: float = 4.0) -> List[Tuple[str, float]]:
+        """Find all high-entropy strings in text."""
+        words = re.split(r'[\s=:,;\"\'\\()/\\-_]+', text)
+        candidates = []
+        
+        for word in words:
+            if len(word) >= 20:
+                entropy = EntropyAnalyzer.calculate_entropy(word)
+                if entropy >= min_entropy:
+                    candidates.append((word, entropy))
+        
+        return sorted(candidates, key=lambda x: x[1], reverse=True)
+
+
+class SecretMatcher:
+    """Match strings against secret patterns."""
+
+    PATTERN_MAP = [
+        (Patterns.AWS_ACCESS_KEY, SecretType.AWS_ACCESS_KEY),
+        (Patterns.AWS_SECRET_KEY, SecretType.AWS_SECRET_KEY),
+        (Patterns.GITHUB_PAT, SecretType.GITHUB_TOKEN),
+        (Patterns.GITHUB_OAUTH, SecretType.GITHUB_OAUTH),
+        (Patterns.SLACK_BOT_TOKEN, SecretType.SLACK_TOKEN),
+        (Patterns.SLACK_USER_TOKEN, SecretType.SLACK_TOKEN),
+        (Patterns.SLACK_WEBHOOK, SecretType.SLACK_TOKEN),
+        (Patterns.SENDGRID_API_KEY, SecretType.SENDGRID_API_KEY),
+        (Patterns.STRIPE_API_KEY, SecretType.STRIPE_API_KEY),
+        (Patterns.MONGODB_URI, SecretType.MONGODB_URI),
+        (Patterns.HEROKU_API_KEY, SecretType.HEROKU_API_KEY),
+        (Patterns.RSA_PRIVATE_KEY, SecretType.SSH_PRIVATE_KEY),
+        (Patterns.OPENSSH_PRIVATE_KEY, SecretType.SSH_PRIVATE_KEY),
+        (Patterns.JWT_TOKEN, SecretType.JWT_TOKEN),
+    ]
+
+    @staticmethod
+    def find_secrets(text: str) -> List[Dict]:
+        """Find all secrets in text."""
+        secrets = []
+        seen = set()
+
+        # Pattern matching
+        for pattern, secret_type in SecretMatcher.PATTERN_MAP:
+            matches = pattern.finditer(text)
+            for match in matches:
+                secret_value = match.group(0)
+                if secret_value not in seen:
+                    secrets.append({
+                        "type": secret_type.value,
+                        "value": secret_value[:50],  # Truncate for safety
+                        "confidence": "HIGH",
+                    })
+                    seen.add(secret_value)
+
+        # Entropy-based detection
+        high_entropy = EntropyAnalyzer.find_high_entropy_strings(text, min_entropy=4.0)
+        for entropy_string, entropy_score in high_entropy[:10]:
+            if entropy_string not in seen and len(entropy_string) >= 30:
+                secrets.append({
+                    "type": SecretType.GENERIC_SECRET.value,
+                    "value": entropy_string[:50],
+                    "entropy": round(entropy_score, 2),
+                    "confidence": "MEDIUM" if entropy_score < 5.0 else "HIGH",
+                })
+                seen.add(entropy_string)
+
+        return secrets
+
+    @staticmethod
+    def find_secret_files(path: str) -> List[str]:
+        """Find files that likely contain secrets."""
+        secret_filenames = [
+            r"\.env",
+            r"secrets?\.\w+",
+            r"config\.\w+",
+            r"credentials\.\w+",
+            r"keys?\.\w+",
+            r"\.aws",
+            r"\.ssh",
+            r"id_rsa",
+        ]
+        
+        matches = []
+        for pattern in secret_filenames:
+            if re.search(pattern, path, re.IGNORECASE):
+                matches.append(pattern)
+        
+        return matches

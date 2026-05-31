@@ -5,7 +5,10 @@ import sys
 import json
 from typing import List, Dict
 from loguru import logger
-from src.patterns import SecretMatcher
+try:
+    from src.patterns import SecretMatcher
+except ModuleNotFoundError:
+    from patterns import SecretMatcher
 
 
 class Scanner:
@@ -125,11 +128,11 @@ Examples:
         with open(args.file, "r", encoding="utf-8", errors="ignore") as f:
             content = f.read()
         secrets = scanner.scan_file(args.file, content)
-    elif args.dir:
-        secrets = scanner.scan_directory(args.dir)
     elif args.text:
         logger.info("📝 Scanning text input")
         secrets = scanner.scan_text(args.text)
+    elif args.dir:
+        secrets = scanner.scan_directory(args.dir)
     else:
         parser.print_help()
         return
