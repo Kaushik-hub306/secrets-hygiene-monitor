@@ -19,14 +19,13 @@ BLOCKED_PATH_PATTERNS = [
     r"^/var/log/",
     r"^/proc/",
     r"^/sys/",
-    r"/\.ssh/",
-    r"/\.gnupg/",
+    r"/\.ssh(?:/|$)",
+    r"/\.gnupg(?:/|$)",
     r"/\.aws/credentials$",
-    r"/\.env$",
-    r"/\.env\.",
-    r"/\.npmrc$",
-    r"/\.docker/",
-    r"/\.kube/",
+    r"/\.env(?:$|\\.)",
+    r"/\\.npmrc$",
+    r"/\.docker(?:/|$)",
+    r"/\.kube(?:/|$)",
 ]
 
 # Compiled blocked path regexes
