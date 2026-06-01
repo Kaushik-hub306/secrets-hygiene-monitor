@@ -1,47 +1,58 @@
-"""Secrets Hygiene Monitor - FastAPI backend with security hardening."""
+"""Secrets Hygiene Monitor - Full backend with OAuth, webhooks, and monitoring."""
 
 import os
+import hashlib
+import hmac
 import json
+import threading
+import time
 from datetime import datetime
 from typing import List, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Request
+import requests
+from fastapi import FastAPI, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from loguru import logger
 from dotenv import load_dotenv
 
 from api.models import (
     ScanRequest, ScanResponse, ScanResult,
-    RepoRegister, AlertConfig, HealthResponse,
+    AlertConfig, HealthResponse,
 )
-from api.scanner import scan_directory, scan_git_repo
+from api.scanner import scan_git_repo
 from api.alerts import send_slack_alert, send_discord_alert
-from api.security import validate_repo_url, validate_local_path
+from api.security import validate_repo_url
+from api.database import (
+    init_db, create_user, get_user_by_github, get_user,
+    add_repo, get_user_repos, get_repo, get_all_repos,
+    delete_repo_db, update_repo_webhook, update_repo_scan_time,
+    add_scan, get_scans_for_repo, get_latest_scan,
+    set_alert_config, get_alert_config,
+)
+from api.worker import scan_repo_and_store, run_scheduled_scan
 
-# Load .env file
 load_dotenv()
 
-# --- Configuration from environment ---
-ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:8000,http://127.0.0.1:8000",
-).split(",")
-
+# --- Config ---
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",")
 APP_ENV = os.getenv("APP_ENV", "development")
 APP_HOST = os.getenv("HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("PORT", "8000"))
 DISABLE_DOCS = os.getenv("DISABLE_DOCS", "false").lower() == "true"
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
+GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET", "")
+DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/secrets_monitor.db")
+SCAN_INTERVAL_HOURS = int(os.getenv("SCAN_INTERVAL_HOURS", "6"))
 
 app = FastAPI(
     title="Secrets Hygiene Monitor",
-    description="Automated secrets detection for dev teams",
     version="0.1.0",
     docs_url="/docs" if not DISABLE_DOCS and APP_ENV != "production" else None,
-    redoc_url="/redoc" if not DISABLE_DOCS and APP_ENV != "production" else None,
+    redoc_url=None,
 )
 
-# CORS -- locked to configured origins, NOT wildcard
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -50,354 +61,616 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
-# --- In-memory store for MVP (swap to SQLite/Postgres later) ---
-repos: Dict[str, dict] = {}
-scans: Dict[str, dict] = {}
-scan_results: Dict[str, list] = {}
+# --- Session store (use signed cookies in production) ---
+_sessions: Dict[str, dict] = {}
 
 
-# --- Rate limiting (simple in-memory) ---
+def get_session(request: Request) -> Optional[dict]:
+    """Get the current user session from cookie."""
+    session_id = request.cookies.get("session_id")
+    if session_id and session_id in _sessions:
+        return _sessions[session_id]
+    return None
+
+
+def require_user(request: Request) -> dict:
+    """Require authenticated user or raise 401."""
+    session = get_session(request)
+    if not session:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return session
+
+
+# --- App startup ---
+@app.on_event("startup")
+async def startup():
+    init_db()
+    # Start background scheduler thread
+    scheduler_thread = threading.Thread(target=_scheduler_loop, daemon=True)
+    scheduler_thread.start()
+    logger.info(f"Server ready on {APP_HOST}:{APP_PORT}, scheduler started ({SCAN_INTERVAL_HOURS}h interval)")
+
+
+def _scheduler_loop():
+    """Background thread that runs periodic scans."""
+    import asyncio
+    # Wait a bit for startup
+    time.sleep(10)
+    while True:
+        try:
+            asyncio.run(run_scheduled_scan())
+        except Exception as e:
+            logger.error(f"Scheduler error: {e}")
+        # Sleep for the configured interval
+        time.sleep(SCAN_INTERVAL_HOURS * 3600)
+
+
+# --- Rate limiting ---
 _rate_limit_store: Dict[str, List[float]] = {}
-RATE_LIMIT_WINDOW = 60  # seconds
-RATE_LIMIT_MAX = 30     # requests per window
 
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    """Simple rate limiting by IP."""
     client_ip = request.client.host if request.client else "unknown"
     now = datetime.utcnow().timestamp()
-
-    # Clean old entries
     if client_ip in _rate_limit_store:
-        _rate_limit_store[client_ip] = [
-            t for t in _rate_limit_store[client_ip]
-            if now - t < RATE_LIMIT_WINDOW
-        ]
+        _rate_limit_store[client_ip] = [t for t in _rate_limit_store[client_ip] if now - t < 60]
     else:
         _rate_limit_store[client_ip] = []
-
-    if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_MAX:
-        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
-
+    if len(_rate_limit_store[client_ip]) >= 60:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
     _rate_limit_store[client_ip].append(now)
     response = await call_next(request)
     return response
 
 
-# --- Endpoints ---
+# ========== GITHUB OAUTH ==========
+
+@app.get("/auth/github")
+async def github_login():
+    """Redirect user to GitHub OAuth."""
+    if not GITHUB_CLIENT_ID:
+        raise HTTPException(status_code=500, detail="GitHub OAuth not configured")
+    github_url = (
+        f"https://github.com/login/oauth/authorize"
+        f"?client_id={GITHUB_CLIENT_ID}"
+        f"&scope=repo,read:user"
+        f"&redirect_uri=http://{APP_HOST}:{APP_PORT}/auth/github/callback"
+    )
+    return RedirectResponse(github_url)
+
+
+@app.get("/auth/github/callback")
+async def github_callback(code: str = Query(...)):
+    """Handle GitHub OAuth callback."""
+    # Exchange code for access token
+    token_resp = requests.post(
+        "https://github.com/login/oauth/access_token",
+        json={
+            "client_id": GITHUB_CLIENT_ID,
+            "client_secret": GITHUB_CLIENT_SECRET,
+            "code": code,
+        },
+        headers={"Accept": "application/json"},
+        timeout=10,
+    )
+    token_data = token_resp.json()
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=400, detail="GitHub auth failed")
+
+    # Get user info
+    user_resp = requests.get(
+        "https://api.github.com/user",
+        headers={"Authorization": f"token {access_token}"},
+        timeout=10,
+    )
+    github_user = user_resp.json()
+
+    # Create or update user in DB
+    user_id = create_user(
+        github_id=github_user["id"],
+        login=github_user["login"],
+        email=github_user.get("email", ""),
+        access_token=access_token,
+    )
+
+    # Set session cookie
+    import secrets
+    session_id = secrets.token_hex(32)
+    _sessions[session_id] = {"user_id": user_id, "login": github_user["login"]}
+
+    resp = RedirectResponse(url="/")
+    resp.set_cookie("session_id", session_id, httponly=True, max_age=86400 * 7)
+    return resp
+
+
+@app.get("/auth/logout")
+async def logout():
+    resp = RedirectResponse(url="/")
+    resp.delete_cookie("session_id")
+    return resp
+
+
+@app.get("/auth/me")
+async def get_me(request: Request):
+    session = get_session(request)
+    if not session:
+        return {"authenticated": False}
+    user = get_user(session["user_id"])
+    return {"authenticated": True, "login": session.get("login"), "user_id": session.get("user_id")}
+
+
+# ========== GITHUB USER REPOS ==========
+
+@app.get("/api/github/repos")
+async def list_github_repos(request: Request):
+    """List repos from the user's GitHub account."""
+    session = require_user(request)
+    user = get_user(session["user_id"])
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    resp = requests.get(
+        "https://api.github.com/user/repos?per_page=100&sort=updated",
+        headers={"Authorization": f"token {user['access_token']}"},
+        timeout=10,
+    )
+    repos = resp.json()
+    return {
+        "repos": [
+            {
+                "id": r["id"],
+                "name": r["full_name"],
+                "url": r["clone_url"],
+                "default_branch": r.get("default_branch", "main"),
+                "private": r.get("private", False),
+            }
+            for r in repos if not r.get("fork")
+        ]
+    }
+
+
+# ========== WEBHOOK RECEIVER ==========
+
+@app.post("/webhooks/github")
+async def github_webhook(request: Request):
+    """Receive GitHub webhook events on push."""
+    body = await request.body()
+
+    # Verify signature
+    if GITHUB_WEBHOOK_SECRET:
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        expected = "sha256=" + hmac.new(
+            GITHUB_WEBHOOK_SECRET.encode(), body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise HTTPException(status_code=401, detail="Invalid signature")
+
+    event = request.headers.get("X-GitHub-Event", "")
+
+    if event == "ping":
+        return {"ok": True}
+
+    if event == "push":
+        payload = json.loads(body)
+        repo_url = payload.get("repository", {}).get("clone_url", "")
+        branch = payload.get("ref", "").replace("refs/heads/", "")
+
+        if not repo_url:
+            return {"ok": True}
+
+        # Find all registrations for this repo
+        all_repos = get_all_repos()
+        for repo in all_repos:
+            if repo["url"] == repo_url or repo.get("github_repo_id") == payload.get("repository", {}).get("id"):
+                import asyncio
+                asyncio.create_task(scan_repo_and_store(
+                    repo_id=repo["id"],
+                    user_id=repo["user_id"],
+                    repo_url=repo["url"],
+                    branch=branch,
+                    triggered_by="webhook",
+                ))
+
+    return {"ok": True}
+
+
+# ========== API ENDPOINTS ==========
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health():
     return HealthResponse()
 
 
-@app.post("/api/scan", response_model=ScanResponse)
-async def scan_repo(request: ScanRequest):
-    """Clone a repo and scan it for secrets."""
-    from uuid import uuid4
+@app.get("/api/dashboard")
+async def dashboard_data(request: Request):
+    """Get all data for the dashboard."""
+    session = get_session(request)
+    if not session:
+        return {"authenticated": False, "repos": [], "scans": []}
 
-    # Validate URL
-    url_error = validate_repo_url(request.repo_url)
-    if url_error:
-        raise HTTPException(status_code=400, detail=f"Invalid repo URL: {url_error}")
+    repos = get_user_repos(session["user_id"])
+    scans = []
+    for repo in repos:
+        latest = get_latest_scan(repo["id"])
+        if latest:
+            scans.append({
+                "repo_name": repo["name"],
+                "repo_url": repo["url"],
+                **latest,
+            })
 
-    scan_id = str(uuid4())[:8]
-    logger.info(f"[{scan_id}] Scanning {request.repo_url} (branch: {request.branch})")
-
-    findings = scan_git_repo(request.repo_url, request.branch)
-
-    if findings is None:
-        raise HTTPException(status_code=400, detail="Failed to clone or scan the repository. Check the URL and branch.")
-
-    critical = sum(1 for f in findings if f.get("severity") == "CRITICAL")
-    high = sum(1 for f in findings if f.get("severity") == "HIGH")
-    medium = sum(1 for f in findings if f.get("severity") == "MEDIUM")
-
-    response = ScanResponse(
-        scan_id=scan_id,
-        repo_url=request.repo_url,
-        status="completed",
-        total_findings=len(findings),
-        critical=critical,
-        high=high,
-        medium=medium,
-        findings=[ScanResult(**f) for f in findings],
-        message=f"Scan complete. {len(findings)} secrets found." if findings else "No secrets detected.",
-    )
-
-    # Store result (truncate secrets in stored data)
-    stored = response.dict()
-    for f in stored.get("findings", []):
-        if f.get("secret"):
-            f["secret"] = f["secret"][:30]  # Extra truncation for storage
-    scans[scan_id] = stored
-
-    return response
-
-
-@app.post("/api/scan/local", response_model=ScanResponse)
-async def scan_local_dir(path: str):
-    """Scan a local directory (for self-hosted use)."""
-    from uuid import uuid4
-
-    # Validate path
-    path_error = validate_local_path(path)
-    if path_error:
-        raise HTTPException(status_code=400, detail=f"Invalid path: {path_error}")
-
-    if not os.path.isdir(path):
-        raise HTTPException(status_code=400, detail=f"Path not found: {path}")
-
-    scan_id = str(uuid4())[:8]
-    findings = scan_directory(path)
-
-    critical = sum(1 for f in findings if f.get("severity") == "CRITICAL")
-    high = sum(1 for f in findings if f.get("severity") == "HIGH")
-    medium = sum(1 for f in findings if f.get("severity") == "MEDIUM")
-
-    return ScanResponse(
-        scan_id=scan_id,
-        repo_url=path,
-        status="completed",
-        total_findings=len(findings),
-        critical=critical,
-        high=high,
-        medium=medium,
-        findings=[ScanResult(**f) for f in findings],
-        message=f"Scan complete. {len(findings)} secrets found." if findings else "No secrets detected.",
-    )
-
-
-@app.get("/api/scans")
-async def list_scans():
-    """List all completed scans (no secret values)."""
-    return {
-        "scans": [
-            {
-                "scan_id": k,
-                "repo_url": v.get("repo_url"),
-                "total_findings": v.get("total_findings"),
-                "critical": v.get("critical"),
-                "high": v.get("high"),
-                "medium": v.get("medium"),
-                "scanned_at": v.get("scanned_at"),
-            }
-            for k, v in scans.items()
-        ]
-    }
-
-
-@app.get("/api/scans/{scan_id}")
-async def get_scan(scan_id: str):
-    """Get a specific scan result (secrets truncated to 30 chars)."""
-    if scan_id not in scans:
-        raise HTTPException(status_code=404, detail="Scan not found")
-    return scans[scan_id]
+    return {"authenticated": True, "repos": repos, "scans": scans}
 
 
 @app.post("/api/repos")
-async def register_repo(repo: RepoRegister):
-    """Register a repository for monitoring."""
-    url_error = validate_repo_url(repo.repo_url)
-    if url_error:
-        raise HTTPException(status_code=400, detail=f"Invalid repo URL: {url_error}")
+async def add_monitored_repo(request: Request):
+    """Add a repo to monitor."""
+    session = require_user(request)
+    data = await request.json()
+    repo_url = data.get("url", "").strip()
+    repo_name = data.get("name", "").strip()
+    branch = data.get("branch", "main").strip()
+    github_repo_id = data.get("github_repo_id")
 
-    repo_id = f"{repo.repo_url}-{datetime.utcnow().timestamp()}"
-    repos[repo_id] = {
-        "id": repo_id,
-        "url": repo.repo_url,
-        "name": repo.name or repo.repo_url.split("/")[-1].replace(".git", ""),
-        "branch": repo.branch,
-        "registered_at": datetime.utcnow().isoformat(),
-        "alert_config": None,
-    }
-    return {"repo_id": repo_id, "message": f"Repo '{repos[repo_id]['name']}' registered."}
+    if not repo_url:
+        raise HTTPException(status_code=400, detail="Missing repo URL")
+
+    url_error = validate_repo_url(repo_url)
+    if url_error:
+        raise HTTPException(status_code=400, detail=f"Invalid URL: {url_error}")
+
+    if not repo_name:
+        repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
+
+    repo_id = add_repo(
+        user_id=session["user_id"],
+        name=repo_name,
+        url=repo_url,
+        branch=branch,
+        github_repo_id=github_repo_id,
+    )
+
+    return {"repo_id": repo_id, "message": f"Now monitoring '{repo_name}'"}
 
 
 @app.get("/api/repos")
-async def list_repos():
-    """List registered repos."""
-    return {"repos": list(repos.values())}
+async def list_monitored_repos(request: Request):
+    session = require_user(request)
+    repos = get_user_repos(session["user_id"])
+    # Add last scan info
+    result = []
+    for repo in repos:
+        latest = get_latest_scan(repo["id"])
+        repo_data = {**repo}
+        if latest:
+            repo_data["last_scan"] = {
+                "total_findings": latest["total_findings"],
+                "critical": latest["critical"],
+                "created_at": latest["created_at"],
+            }
+        result.append(repo_data)
+    return {"repos": result}
+
+
+@app.post("/api/repos/{repo_id}/scan")
+async def trigger_scan(repo_id: str, request: Request):
+    """Manually trigger a scan of a monitored repo."""
+    session = require_user(request)
+    repo = get_repo(repo_id)
+    if not repo or repo["user_id"] != session["user_id"]:
+        raise HTTPException(status_code=404, detail="Repo not found")
+
+    result = await scan_repo_and_store(
+        repo_id=repo["id"],
+        user_id=session["user_id"],
+        repo_url=repo["url"],
+        branch=repo.get("branch", "main"),
+        triggered_by="manual",
+    )
+    return result
 
 
 @app.post("/api/repos/{repo_id}/alert")
-async def configure_alerts(repo_id: str, config: AlertConfig):
-    """Configure alerting for a registered repo."""
-    if repo_id not in repos:
+async def configure_alerts(repo_id: str, request: Request):
+    """Configure alerting for a repo."""
+    session = require_user(request)
+    repo = get_repo(repo_id)
+    if not repo or repo["user_id"] != session["user_id"]:
         raise HTTPException(status_code=404, detail="Repo not found")
-    repos[repo_id]["alert_config"] = config.dict()
-    return {"message": "Alert config saved."}
+
+    data = await request.json()
+    set_alert_config(
+        repo_id=repo_id,
+        slack_webhook=data.get("slack_webhook"),
+        discord_webhook=data.get("discord_webhook"),
+        on_critical_only=data.get("on_critical_only", False),
+    )
+    return {"message": "Alert config saved"}
 
 
 @app.delete("/api/repos/{repo_id}")
-async def delete_repo(repo_id: str):
-    """Remove a registered repo."""
-    if repo_id not in repos:
+async def remove_repo(repo_id: str, request: Request):
+    """Remove a monitored repo."""
+    session = require_user(request)
+    repo = get_repo(repo_id)
+    if not repo or repo["user_id"] != session["user_id"]:
         raise HTTPException(status_code=404, detail="Repo not found")
-    del repos[repo_id]
-    return {"message": "Repo removed."}
+    delete_repo_db(repo_id)
+    return {"message": "Repo removed"}
 
 
-# --- Static web UI ---
+@app.get("/api/repos/{repo_id}/scans")
+async def get_repo_scans(repo_id: str, request: Request):
+    session = require_user(request)
+    repo = get_repo(repo_id)
+    if not repo or repo["user_id"] != session["user_id"]:
+        raise HTTPException(status_code=404, detail="Repo not found")
+    scans = get_scans_for_repo(repo_id)
+    return {"scans": scans}
+
+
+# ========== DASHBOARD UI ==========
+
 @app.get("/", response_class=HTMLResponse)
-async def dashboard():
-    """Serve the minimal dashboard."""
-    return DASHBOARD_HTML
+async def dashboard(request: Request):
+    session = get_session(request)
+    auth_section = ""
+    if session:
+        auth_section = f'<p style="color:#64748b;font-size:0.85rem;">Logged in as {session["login"]} | <a href="/auth/logout" style="color:#3b8f6f;">Logout</a></p>'
+    else:
+        auth_section = '<a href="/auth/github" style="color:#3b8f6f;text-decoration:none;font-size:0.9rem;">Login with GitHub to get started</a>'
 
-
-DASHBOARD_HTML = """
-<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Secrets Hygiene Monitor</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e2e8f0; line-height: 1.6; }
-  .container { max-width: 960px; margin: 0 auto; padding: 2rem; }
-  h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
-  h2 { font-size: 1.3rem; margin: 1.5rem 0 0.75rem; color: #94a3b8; }
-  .subtitle { color: #64748b; margin-bottom: 2rem; }
-  .card { background: #1e2130; border: 1px solid #2d3748; border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
-  .card h3 { margin-bottom: 0.5rem; }
-  input, button { padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid #374151; background: #1a1d2e; color: #e2e8f0; font-size: 0.95rem; }
-  input { width: 100%; margin-bottom: 0.5rem; }
-  input:focus { outline: none; border-color: #3b82f6; }
-  button { cursor: pointer; background: #3b82f6; border-color: #3b82f6; color: white; font-weight: 500; margin-top: 0.25rem; }
-  button:hover { background: #2563eb; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .finding { padding: 0.75rem; border-left: 3px solid; margin-bottom: 0.5rem; background: #161b26; border-radius: 0 6px 6px 0; }
-  .finding.CRITICAL { border-color: #ef4444; }
-  .finding.HIGH { border-color: #f97316; }
-  .finding.MEDIUM { border-color: #eab308; }
-  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-  .badge.CRITICAL { background: #ef444420; color: #ef4444; }
-  .badge.HIGH { background: #f9731620; color: #f97316; }
-  .badge.MEDIUM { background: #eab30820; color: #eab308; }
-  .stats { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
-  .stat { flex: 1; min-width: 100px; text-align: center; padding: 1rem; background: #1e2130; border-radius: 8px; border: 1px solid #2d3748; }
-  .stat .number { font-size: 2rem; font-weight: 700; }
-  .stat .label { font-size: 0.8rem; color: #64748b; text-transform: uppercase; }
-  .stat.critical .number { color: #ef4444; }
-  .stat.high .number { color: #f97316; }
-  .stat.medium .number { color: #eab308; }
-  .repo-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #2d3748; }
-  .repo-item:last-child { border-bottom: none; }
-  .delete-btn { background: transparent; border: none; color: #ef4444; cursor: pointer; font-size: 0.85rem; padding: 0.25rem 0.5rem; margin: 0; }
-  .delete-btn:hover { background: #ef444420; }
-  #message { padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; display: none; }
-  #message.success { display: block; background: #22c55e20; color: #22c55e; border: 1px solid #22c55e40; }
-  #message.error { display: block; background: #ef444420; color: #ef4444; border: 1px solid #ef444440; }
-  .loading { opacity: 0.6; pointer-events: none; }
-  .secure-note { font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; }
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e2e8f0; line-height: 1.6; }}
+  .container {{ max-width: 960px; margin: 0 auto; padding: 2rem; }}
+  h1 {{ font-size: 1.8rem; margin-bottom: 0.25rem; }}
+  h2 {{ font-size: 1.2rem; margin: 1.5rem 0 0.75rem; color: #94a3b8; }}
+  .subtitle {{ color: #64748b; margin-bottom: 1.5rem; }}
+  .card {{ background: #1e2130; border: 1px solid #2d3748; border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }}
+  .card h3 {{ margin-bottom: 0.5rem; }}
+  input, button, select {{ padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid #374151; background: #1a1d2e; color: #e2e8f0; font-size: 0.95rem; }}
+  input {{ width: 100%; margin-bottom: 0.5rem; }}
+  input:focus {{ outline: none; border-color: #3b82f6; }}
+  button {{ cursor: pointer; background: #3b82f6; border-color: #3b82f6; color: white; font-weight: 500; }}
+  button:hover {{ background: #2563eb; }}
+  button:disabled {{ opacity: 0.5; cursor: not-allowed; }}
+  button.danger {{ background: transparent; border-color: #ef4444; color: #ef4444; padding: 0.3rem 0.6rem; font-size: 0.8rem; }}
+  button.danger:hover {{ background: #ef444420; }}
+  .finding {{ padding: 0.75rem; border-left: 3px solid; margin-bottom: 0.5rem; background: #161b26; border-radius: 0 6px 6px 0; }}
+  .finding.CRITICAL {{ border-color: #ef4444; }}
+  .finding.HIGH {{ border-color: #f97316; }}
+  .finding.MEDIUM {{ border-color: #eab308; }}
+  .badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }}
+  .badge.CRITICAL {{ background: #ef444420; color: #ef4444; }}
+  .badge.HIGH {{ background: #f9731620; color: #f97316; }}
+  .badge.MEDIUM {{ background: #eab30820; color: #eab308; }}
+  .stats {{ display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }}
+  .stat {{ flex: 1; min-width: 80px; text-align: center; padding: 0.75rem; background: #1e2130; border-radius: 8px; border: 1px solid #2d3748; }}
+  .stat .number {{ font-size: 1.5rem; font-weight: 700; }}
+  .stat .label {{ font-size: 0.7rem; color: #64748b; text-transform: uppercase; }}
+  .stat.critical .number {{ color: #ef4444; }}
+  .stat.high .number {{ color: #f97316; }}
+  .stat.medium .number {{ color: #eab308; }}
+  .repo-card {{ display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem; border-bottom: 1px solid #2d3748; }}
+  .repo-card:last-child {{ border-bottom: none; }}
+  .repo-info {{ flex: 1; }}
+  .repo-actions {{ display: flex; gap: 0.5rem; }}
+  .secure-note {{ font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; }}
+  .status-dot {{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem; }}
+  .status-dot.active {{ background: #22c55e; }}
+  .status-dot.inactive {{ background: #64748b; }}
+  #message {{ padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; display: none; }}
+  #message.success {{ display: block; background: #22c55e20; color: #22c55e; border: 1px solid #22c55e40; }}
+  #message.error {{ display: block; background: #ef444420; color: #ef4444; border: 1px solid #ef444440; }}
+  .row {{ display: flex; gap: 0.5rem; align-items: flex-end; }}
+  .row input {{ flex: 1; }}
 </style>
 </head>
 <body>
 <div class="container">
   <h1>Secrets Hygiene Monitor</h1>
-  <p class="subtitle">Scan your repositories for leaked credentials and secrets</p>
-  <p class="secure-note">Secrets are truncated in responses and never stored in full.</p>
+  <p class="subtitle">24/7 automated secret detection for your repositories</p>
+  {auth_section}
 
   <div id="message"></div>
 
-  <div class="card">
-    <h3>Scan a Repository</h3>
-    <input type="text" id="repoUrl" placeholder="https://github.com/user/repo" />
-    <input type="text" id="branch" placeholder="Branch (default: main)" value="main" style="width: 200px;" />
-    <button onclick="startScan()" id="scanBtn">Scan</button>
-  </div>
-
-  <div id="results" style="display: none;">
-    <h2>Scan Results</h2>
-    <div class="stats">
-      <div class="stat"><div class="number" id="total">0</div><div class="label">Total</div></div>
-      <div class="stat critical"><div class="number" id="criticalCount">0</div><div class="label">Critical</div></div>
-      <div class="stat high"><div class="number" id="highCount">0</div><div class="label">High</div></div>
-      <div class="stat medium"><div class="number" id="mediumCount">0</div><div class="label">Medium</div></div>
+  <div id="guest-view">
+    <div class="card" style="text-align:center;padding:3rem;">
+      <h3>Welcome</h3>
+      <p style="color:#64748b;margin:1rem 0;">Connect your GitHub account to start monitoring your repositories for leaked secrets.</p>
+      <a href="/auth/github" style="display:inline-block;padding:0.75rem 1.5rem;background:#3b82f6;color:white;text-decoration:none;border-radius:6px;font-weight:500;">Login with GitHub</a>
     </div>
-    <div id="findings"></div>
   </div>
 
-  <h2>Recent Scans</h2>
-  <div class="card" id="repoList"><p style="color: #64748b;">No scans yet. Scan a repo above to get started.</p></div>
+  <div id="dashboard-view" style="display:none;">
+    <h2>Monitored Repos</h2>
+    <div class="card" id="repo-list"><p style="color:#64748b;">No repos yet. Add one below.</p></div>
+
+    <h2>Add Repository</h2>
+    <div class="card">
+      <div id="add-repo-form">
+        <div class="row">
+          <input type="text" id="repoUrl" placeholder="https://github.com/user/repo" style="flex:2;" />
+          <input type="text" id="repoBranch" placeholder="Branch" value="main" style="width:100px;" />
+          <button onclick="addRepo()">Add</button>
+        </div>
+        <p class="secure-note">Or pick from your GitHub repos below:</p>
+        <button onclick="loadGitHubRepos()" style="background:#374151;margin-top:0.5rem;">Load my GitHub repos</button>
+        <div id="github-repo-list" style="margin-top:0.75rem;"></div>
+      </div>
+    </div>
+
+    <h2>Recent Scans</h2>
+    <div class="card" id="scan-list"><p style="color:#64748b;">No scans yet.</p></div>
+  </div>
 </div>
 
 <script>
-  function showMsg(msg, type) {
-    var el = document.getElementById('message');
-    el.textContent = msg;
-    el.className = type;
-    setTimeout(function() { el.style.display = 'none'; }, 5000);
-  }
+var isAuthenticated = {str(bool(session)).toLowerCase()};
 
-  async function startScan() {
-    var url = document.getElementById('repoUrl').value.trim();
-    var branch = document.getElementById('branch').value.trim() || 'main';
-    if (!url) { showMsg('Enter a repo URL', 'error'); return; }
+function showMsg(msg, type) {{
+  var el = document.getElementById('message');
+  el.textContent = msg;
+  el.className = type;
+  setTimeout(function() {{ el.style.display = 'none'; }}, 5000);
+}}
 
-    var btn = document.getElementById('scanBtn');
-    btn.disabled = true; btn.textContent = 'Scanning...';
-    document.getElementById('results').style.display = 'none';
+function init() {{
+  if (isAuthenticated) {{
+    document.getElementById('guest-view').style.display = 'none';
+    document.getElementById('dashboard-view').style.display = 'block';
+    loadDashboard();
+  }}
+}}
 
-    try {
-      var res = await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo_url: url, branch: branch }),
-      });
-      var data = await res.json();
-      if (!res.ok) {
-        showMsg(data.detail || 'Scan failed', 'error');
-        return;
-      }
-      showResults(data);
-      addScanEntry(data);
-    } catch (e) {
-      showMsg('Scan failed: ' + e.message, 'error');
-    } finally {
-      btn.disabled = false; btn.textContent = 'Scan';
-    }
-  }
-
-  function showResults(data) {
-    document.getElementById('results').style.display = 'block';
-    document.getElementById('total').textContent = data.total_findings;
-    document.getElementById('criticalCount').textContent = data.critical;
-    document.getElementById('highCount').textContent = data.high;
-    document.getElementById('mediumCount').textContent = data.medium;
-
-    var container = document.getElementById('findings');
-    if (!data.findings || data.findings.length === 0) {
-      container.innerHTML = '<p style="color: #22c55e;">No secrets detected!</p>';
+async function loadDashboard() {{
+  try {{
+    var res = await fetch('/api/dashboard');
+    var data = await res.json();
+    if (!data.authenticated) {{
+      isAuthenticated = false;
+      document.getElementById('guest-view').style.display = 'block';
+      document.getElementById('dashboard-view').style.display = 'none';
       return;
-    }
-    container.innerHTML = data.findings.map(function(f) {
-      return '<div class="finding ' + f.severity + '">' +
-        '<span class="badge ' + f.severity + '">' + f.severity + '</span> ' +
-        '<strong>' + (f.description || f.rule_id) + '</strong>' +
-        '<div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem;">' +
-        f.file + ':' + f.line + ' \u00b7 Rule: ' + f.rule_id +
-        '</div></div>';
-    }).join('');
-  }
+    }}
+    renderRepos(data.repos);
+    renderScans(data.scans);
+  }} catch(e) {{
+    showMsg('Failed to load dashboard: ' + e.message, 'error');
+  }}
+}}
 
-  function addScanEntry(data) {
-    var list = document.getElementById('repoList');
-    var div = document.createElement('div');
-    div.className = 'repo-item';
-    div.innerHTML = '<div>' +
-      '<strong>' + data.repo_url + '</strong>' +
-      '<div style="font-size: 0.8rem; color: #64748b;">' +
-      data.total_findings + ' findings \u00b7 ' + data.scanned_at +
-      '</div></div>' +
-      '<button class="delete-btn" onclick="this.parentElement.remove()">Remove</button>';
-    list.insertBefore(div, list.firstChild);
-    var p = list.querySelector('p');
-    if (p) p.remove();
-  }
+function renderRepos(repos) {{
+  var el = document.getElementById('repo-list');
+  if (!repos || repos.length === 0) {{
+    el.innerHTML = '<p style="color:#64748b;">No repos yet. Add one below.</p>';
+    return;
+  }}
+  el.innerHTML = repos.map(function(r) {{
+    var lastScan = r.last_scan;
+    var scanInfo = lastScan
+      ? lastScan.total_findings + ' findings (last: ' + lastScan.created_at.slice(0,10) + ')'
+      : 'Not scanned yet';
+    return '<div class="repo-card">' +
+      '<div class="repo-info">' +
+        '<span class="status-dot active"></span><strong>' + r.name + '</strong>' +
+        '<div style="font-size:0.8rem;color:#64748b;">' + r.url + ' \u00b7 ' + scanInfo + '</div>' +
+      '</div>' +
+      '<div class="repo-actions">' +
+        '<button onclick="scanRepo(\\'' + r.id + '\\')">Scan Now</button>' +
+        '<button class="danger" onclick="removeRepo(\\'' + r.id + '\\')">Remove</button>' +
+      '</div>' +
+    '</div>';
+  }});
+}}
+
+function renderScans(scans) {{
+  var el = document.getElementById('scan-list');
+  if (!scans || scans.length === 0) {{
+    el.innerHTML = '<p style="color:#64748b;">No scans yet.</p>';
+    return;
+  }}
+  el.innerHTML = scans.slice(0,10).map(function(s) {{
+    return '<div class="repo-card">' +
+      '<div class="repo-info">' +
+        '<strong>' + s.repo_name + '</strong>' +
+        '<div style="font-size:0.8rem;color:#64748b;">' +
+        s.total_findings + ' findings \u00b7 ' + s.triggered_by + ' \u00b7 ' + s.created_at.slice(0,16) +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }});
+}}
+
+async function addRepo() {{
+  var url = document.getElementById('repoUrl').value.trim();
+  var branch = document.getElementById('repoBranch').value.trim() || 'main';
+  if (!url) {{ showMsg('Enter a repo URL', 'error'); return; }}
+  try {{
+    var res = await fetch('/api/repos', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{url: url, branch: branch}}),
+    }});
+    var data = await res.json();
+    if (!res.ok) {{ showMsg(data.detail || 'Failed', 'error'); return; }}
+    showMsg(data.message, 'success');
+    document.getElementById('repoUrl').value = '';
+    loadDashboard();
+  }} catch(e) {{
+    showMsg('Failed: ' + e.message, 'error');
+  }}
+}}
+
+async function loadGitHubRepos() {{
+  try {{
+    var res = await fetch('/api/github/repos');
+    var data = await res.json();
+    if (!res.ok) {{ showMsg(data.detail || 'Failed', 'error'); return; }}
+    var el = document.getElementById('github-repo-list');
+    el.innerHTML = data.repos.slice(0,20).map(function(r) {{
+      return '<div class="repo-card" style="padding:0.5rem;">' +
+        '<div class="repo-info"><strong>' + r.name + '</strong>' +
+        '<div style="font-size:0.75rem;color:#64748b;">' + (r.private ? 'Private' : 'Public') + '</div></div>' +
+        '<button onclick="addGitHubRepo(\\'' + r.url + '\\', \\'' + r.name + '\\', ' + r.id + ', \\'' + r.default_branch + '\\')">Add</button>' +
+      '</div>';
+    }});
+  }} catch(e) {{
+    showMsg('Failed: ' + e.message, 'error');
+  }}
+}}
+
+async function addGitHubRepo(url, name, githubId, branch) {{
+  try {{
+    var res = await fetch('/api/repos', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{url: url, name: name, branch: branch, github_repo_id: githubId}}),
+    }});
+    var data = await res.json();
+    if (!res.ok) {{ showMsg(data.detail || 'Failed', 'error'); return; }}
+    showMsg(data.message, 'success');
+    loadDashboard();
+  }} catch(e) {{
+    showMsg('Failed: ' + e.message, 'error');
+  }}
+}}
+
+async function scanRepo(repoId) {{
+  try {{
+    var res = await fetch('/api/repos/' + repoId + '/scan', {{method: 'POST'}});
+    var data = await res.json();
+    if (!res.ok) {{ showMsg(data.detail || 'Scan failed', 'error'); return; }}
+    showMsg('Scan started! ' + (data.total_findings || 0) + ' findings.', 'success');
+    setTimeout(loadDashboard, 3000);
+  }} catch(e) {{
+    showMsg('Failed: ' + e.message, 'error');
+  }}
+}}
+
+async function removeRepo(repoId) {{
+  if (!confirm('Remove this repo from monitoring?')) return;
+  try {{
+    var res = await fetch('/api/repos/' + repoId, {{method: 'DELETE'}});
+    var data = await res.json();
+    if (!res.ok) {{ showMsg(data.detail || 'Failed', 'error'); return; }}
+    showMsg('Repo removed', 'success');
+    loadDashboard();
+  }} catch(e) {{
+    showMsg('Failed: ' + e.message, 'error');
+  }}
+}}
+
+init();
 </script>
 </body>
-</html>
-"""
+</html>"""
