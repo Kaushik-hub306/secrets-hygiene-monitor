@@ -106,7 +106,7 @@ def main():
 Examples:
   python src/scanner.py --dir .
   python src/scanner.py --file config.yaml
-  python src/scanner.py --text 'AKIAIOSFODNN7EXAMPLE'
+  python src/scanner.py --text 'AKIAIOSFODNN7EXAMPLE'my
         """
     )
     parser.add_argument("--file", help="Scan a single file")
