@@ -13,6 +13,8 @@ import requests
 from fastapi import FastAPI, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from loguru import logger
 from dotenv import load_dotenv
 
@@ -52,6 +54,12 @@ app = FastAPI(
     docs_url="/docs" if not DISABLE_DOCS and APP_ENV != "production" else None,
     redoc_url=None,
 )
+
+# Static files and templates
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 app.add_middleware(
     CORSMiddleware,
@@ -411,266 +419,33 @@ async def get_repo_scans(repo_id: str, request: Request):
     return {"scans": scans}
 
 
-# ========== DASHBOARD UI ==========
+# ========== PAGE ROUTES ==========
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def home(request: Request):
+    """Home page: landing for guests, dashboard for authenticated users."""
     session = get_session(request)
-    auth_section = ""
     if session:
-        auth_section = f'<p style="color:#64748b;font-size:0.85rem;">Logged in as {session["login"]} | <a href="/auth/logout" style="color:#3b8f6f;">Logout</a></p>'
-    else:
-        auth_section = '<a href="/auth/github" style="color:#3b8f6f;text-decoration:none;font-size:0.9rem;">Login with GitHub to get started</a>'
+        return templates.TemplateResponse("dashboard.html", {"request": request, "session": session})
+    return templates.TemplateResponse("landing.html", {"request": request, "session": None})
 
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Secrets Hygiene Monitor</title>
-<style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e2e8f0; line-height: 1.6; }}
-  .container {{ max-width: 960px; margin: 0 auto; padding: 2rem; }}
-  h1 {{ font-size: 1.8rem; margin-bottom: 0.25rem; }}
-  h2 {{ font-size: 1.2rem; margin: 1.5rem 0 0.75rem; color: #94a3b8; }}
-  .subtitle {{ color: #64748b; margin-bottom: 1.5rem; }}
-  .card {{ background: #1e2130; border: 1px solid #2d3748; border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }}
-  .card h3 {{ margin-bottom: 0.5rem; }}
-  input, button, select {{ padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid #374151; background: #1a1d2e; color: #e2e8f0; font-size: 0.95rem; }}
-  input {{ width: 100%; margin-bottom: 0.5rem; }}
-  input:focus {{ outline: none; border-color: #3b82f6; }}
-  button {{ cursor: pointer; background: #3b82f6; border-color: #3b82f6; color: white; font-weight: 500; }}
-  button:hover {{ background: #2563eb; }}
-  button:disabled {{ opacity: 0.5; cursor: not-allowed; }}
-  button.danger {{ background: transparent; border-color: #ef4444; color: #ef4444; padding: 0.3rem 0.6rem; font-size: 0.8rem; }}
-  button.danger:hover {{ background: #ef444420; }}
-  .finding {{ padding: 0.75rem; border-left: 3px solid; margin-bottom: 0.5rem; background: #161b26; border-radius: 0 6px 6px 0; }}
-  .finding.CRITICAL {{ border-color: #ef4444; }}
-  .finding.HIGH {{ border-color: #f97316; }}
-  .finding.MEDIUM {{ border-color: #eab308; }}
-  .badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }}
-  .badge.CRITICAL {{ background: #ef444420; color: #ef4444; }}
-  .badge.HIGH {{ background: #f9731620; color: #f97316; }}
-  .badge.MEDIUM {{ background: #eab30820; color: #eab308; }}
-  .stats {{ display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }}
-  .stat {{ flex: 1; min-width: 80px; text-align: center; padding: 0.75rem; background: #1e2130; border-radius: 8px; border: 1px solid #2d3748; }}
-  .stat .number {{ font-size: 1.5rem; font-weight: 700; }}
-  .stat .label {{ font-size: 0.7rem; color: #64748b; text-transform: uppercase; }}
-  .stat.critical .number {{ color: #ef4444; }}
-  .stat.high .number {{ color: #f97316; }}
-  .stat.medium .number {{ color: #eab308; }}
-  .repo-card {{ display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem; border-bottom: 1px solid #2d3748; }}
-  .repo-card:last-child {{ border-bottom: none; }}
-  .repo-info {{ flex: 1; }}
-  .repo-actions {{ display: flex; gap: 0.5rem; }}
-  .secure-note {{ font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; }}
-  .status-dot {{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem; }}
-  .status-dot.active {{ background: #22c55e; }}
-  .status-dot.inactive {{ background: #64748b; }}
-  #message {{ padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; display: none; }}
-  #message.success {{ display: block; background: #22c55e20; color: #22c55e; border: 1px solid #22c55e40; }}
-  #message.error {{ display: block; background: #ef444420; color: #ef4444; border: 1px solid #ef444440; }}
-  .row {{ display: flex; gap: 0.5rem; align-items: flex-end; }}
-  .row input {{ flex: 1; }}
-</style>
-</head>
-<body>
-<div class="container">
-  <h1>Secrets Hygiene Monitor</h1>
-  <p class="subtitle">24/7 automated secret detection for your repositories</p>
-  {auth_section}
 
-  <div id="message"></div>
+@app.get("/repo/{repo_id}", response_class=HTMLResponse)
+async def repo_detail(request: Request, repo_id: str):
+    """Repository detail page."""
+    session = require_user(request)
+    return templates.TemplateResponse("repo_detail.html", {"request": request, "session": session, "repo_id": repo_id})
 
-  <div id="guest-view">
-    <div class="card" style="text-align:center;padding:3rem;">
-      <h3>Welcome</h3>
-      <p style="color:#64748b;margin:1rem 0;">Connect your GitHub account to start monitoring your repositories for leaked secrets.</p>
-      <a href="/auth/github" style="display:inline-block;padding:0.75rem 1.5rem;background:#3b82f6;color:white;text-decoration:none;border-radius:6px;font-weight:500;">Login with GitHub</a>
-    </div>
-  </div>
 
-  <div id="dashboard-view" style="display:none;">
-    <h2>Monitored Repos</h2>
-    <div class="card" id="repo-list"><p style="color:#64748b;">No repos yet. Add one below.</p></div>
+@app.get("/scan/{scan_id}", response_class=HTMLResponse)
+async def scan_results(request: Request, scan_id: str):
+    """Scan results detail page."""
+    session = require_user(request)
+    return templates.TemplateResponse("scan_results.html", {"request": request, "session": session, "scan_id": scan_id})
 
-    <h2>Add Repository</h2>
-    <div class="card">
-      <div id="add-repo-form">
-        <div class="row">
-          <input type="text" id="repoUrl" placeholder="https://github.com/user/repo" style="flex:2;" />
-          <input type="text" id="repoBranch" placeholder="Branch" value="main" style="width:100px;" />
-          <button onclick="addRepo()">Add</button>
-        </div>
-        <p class="secure-note">Or pick from your GitHub repos below:</p>
-        <button onclick="loadGitHubRepos()" style="background:#374151;margin-top:0.5rem;">Load my GitHub repos</button>
-        <div id="github-repo-list" style="margin-top:0.75rem;"></div>
-      </div>
-    </div>
 
-    <h2>Recent Scans</h2>
-    <div class="card" id="scan-list"><p style="color:#64748b;">No scans yet.</p></div>
-  </div>
-</div>
-
-<script>
-var isAuthenticated = {"true" if session else "false"};
-
-function showMsg(msg, type) {{
-  var el = document.getElementById('message');
-  el.textContent = msg;
-  el.className = type;
-  setTimeout(function() {{ el.style.display = 'none'; }}, 5000);
-}}
-
-function init() {{
-  if (isAuthenticated) {{
-    document.getElementById('guest-view').style.display = 'none';
-    document.getElementById('dashboard-view').style.display = 'block';
-    loadDashboard();
-  }}
-}}
-
-async function loadDashboard() {{
-  try {{
-    var res = await fetch('/api/dashboard');
-    var data = await res.json();
-    if (!data.authenticated) {{
-      isAuthenticated = false;
-      document.getElementById('guest-view').style.display = 'block';
-      document.getElementById('dashboard-view').style.display = 'none';
-      return;
-    }}
-    renderRepos(data.repos);
-    renderScans(data.scans);
-  }} catch(e) {{
-    showMsg('Failed to load dashboard: ' + e.message, 'error');
-  }}
-}}
-
-function renderRepos(repos) {{
-  var el = document.getElementById('repo-list');
-  if (!repos || repos.length === 0) {{
-    el.innerHTML = '<p style="color:#64748b;">No repos yet. Add one below.</p>';
-    return;
-  }}
-  el.innerHTML = repos.map(function(r) {{
-    var lastScan = r.last_scan;
-    var scanInfo = lastScan
-      ? lastScan.total_findings + ' findings (last: ' + lastScan.created_at.slice(0,10) + ')'
-      : 'Not scanned yet';
-    return '<div class="repo-card">' +
-      '<div class="repo-info">' +
-        '<span class="status-dot active"></span><strong>' + r.name + '</strong>' +
-        '<div style="font-size:0.8rem;color:#64748b;">' + r.url + ' \u00b7 ' + scanInfo + '</div>' +
-      '</div>' +
-      '<div class="repo-actions">' +
-        '<button onclick="scanRepo(\\'' + r.id + '\\')">Scan Now</button>' +
-        '<button class="danger" onclick="removeRepo(\\'' + r.id + '\\')">Remove</button>' +
-      '</div>' +
-    '</div>';
-  }});
-}}
-
-function renderScans(scans) {{
-  var el = document.getElementById('scan-list');
-  if (!scans || scans.length === 0) {{
-    el.innerHTML = '<p style="color:#64748b;">No scans yet.</p>';
-    return;
-  }}
-  el.innerHTML = scans.slice(0,10).map(function(s) {{
-    return '<div class="repo-card">' +
-      '<div class="repo-info">' +
-        '<strong>' + s.repo_name + '</strong>' +
-        '<div style="font-size:0.8rem;color:#64748b;">' +
-        s.total_findings + ' findings \u00b7 ' + s.triggered_by + ' \u00b7 ' + s.created_at.slice(0,16) +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  }});
-}}
-
-async function addRepo() {{
-  var url = document.getElementById('repoUrl').value.trim();
-  var branch = document.getElementById('repoBranch').value.trim() || 'main';
-  if (!url) {{ showMsg('Enter a repo URL', 'error'); return; }}
-  try {{
-    var res = await fetch('/api/repos', {{
-      method: 'POST',
-      headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{url: url, branch: branch}}),
-    }});
-    var data = await res.json();
-    if (!res.ok) {{ showMsg(data.detail || 'Failed', 'error'); return; }}
-    showMsg(data.message, 'success');
-    document.getElementById('repoUrl').value = '';
-    loadDashboard();
-  }} catch(e) {{
-    showMsg('Failed: ' + e.message, 'error');
-  }}
-}}
-
-async function loadGitHubRepos() {{
-  try {{
-    var res = await fetch('/api/github/repos');
-    var data = await res.json();
-    if (!res.ok) {{ showMsg(data.detail || 'Failed', 'error'); return; }}
-    var el = document.getElementById('github-repo-list');
-    el.innerHTML = data.repos.slice(0,20).map(function(r) {{
-      return '<div class="repo-card" style="padding:0.5rem;">' +
-        '<div class="repo-info"><strong>' + r.name + '</strong>' +
-        '<div style="font-size:0.75rem;color:#64748b;">' + (r.private ? 'Private' : 'Public') + '</div></div>' +
-        '<button onclick="addGitHubRepo(\\'' + r.url + '\\', \\'' + r.name + '\\', ' + r.id + ', \\'' + r.default_branch + '\\')">Add</button>' +
-      '</div>';
-    }});
-  }} catch(e) {{
-    showMsg('Failed: ' + e.message, 'error');
-  }}
-}}
-
-async function addGitHubRepo(url, name, githubId, branch) {{
-  try {{
-    var res = await fetch('/api/repos', {{
-      method: 'POST',
-      headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{url: url, name: name, branch: branch, github_repo_id: githubId}}),
-    }});
-    var data = await res.json();
-    if (!res.ok) {{ showMsg(data.detail || 'Failed', 'error'); return; }}
-    showMsg(data.message, 'success');
-    loadDashboard();
-  }} catch(e) {{
-    showMsg('Failed: ' + e.message, 'error');
-  }}
-}}
-
-async function scanRepo(repoId) {{
-  try {{
-    var res = await fetch('/api/repos/' + repoId + '/scan', {{method: 'POST'}});
-    var data = await res.json();
-    if (!res.ok) {{ showMsg(data.detail || 'Scan failed', 'error'); return; }}
-    showMsg('Scan started! ' + (data.total_findings || 0) + ' findings.', 'success');
-    setTimeout(loadDashboard, 3000);
-  }} catch(e) {{
-    showMsg('Failed: ' + e.message, 'error');
-  }}
-}}
-
-async function removeRepo(repoId) {{
-  if (!confirm('Remove this repo from monitoring?')) return;
-  try {{
-    var res = await fetch('/api/repos/' + repoId, {{method: 'DELETE'}});
-    var data = await res.json();
-    if (!res.ok) {{ showMsg(data.detail || 'Failed', 'error'); return; }}
-    showMsg('Repo removed', 'success');
-    loadDashboard();
-  }} catch(e) {{
-    showMsg('Failed: ' + e.message, 'error');
-  }}
-}}
-
-init();
-</script>
-</body>
-</html>"""
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    """Settings page."""
+    session = require_user(request)
+    return templates.TemplateResponse("settings.html", {"request": request, "session": session})

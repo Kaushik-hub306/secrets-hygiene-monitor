@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — Secrets Hygiene Monitor</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}">
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       SETTINGS — Page-Specific Styles
+       ═══════════════════════════════════════════════════════ */
+
+    /* ── Page Header ── */
+    .settings-header {
+      margin-bottom: var(--sp-6);
+    }
+    .settings-header h1 {
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: var(--tracking-tight);
+      line-height: var(--leading-tight);
+    }
+    .settings-header p {
+      font-size: var(--text-sm);
+      color: var(--text-tertiary);
+      margin-top: var(--sp-1);
+    }
+
+    /* ── Settings Layout ── */
+    .settings-layout {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-5);
+      max-width: 860px;
+    }
+
+    /* ── Settings Card ── */
+    .settings-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      transition: border-color var(--duration-fast) var(--ease-out);
+    }
+    .settings-card:hover {
+      border-color: var(--border-hover);
+    }
+
+    /* Card header (accordion trigger) */
+    .settings-card-header {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-4);
+      padding: var(--sp-5) var(--sp-6);
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--duration-fast) var(--ease-out);
+    }
+    .settings-card-header:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .settings-card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .settings-card-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+    .settings-card-icon.emerald {
+      background: rgba(var(--rgb-emerald), 0.1);
+      color: var(--accent-emerald);
+    }
+    .settings-card-icon.blue {
+      background: var(--info-bg);
+      color: var(--info-500);
+    }
+    .settings-card-icon.violet {
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--accent-violet);
+    }
+    .settings-card-icon.teal {
+      background: rgba(var(--rgb-teal), 0.1);
+      color: var(--accent-teal);
+    }
+    .settings-card-icon.red {
+      background: var(--danger-bg);
+      color: var(--danger-500);
+    }
+    .settings-card-title-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+    .settings-card-title {
+      font-size: var(--text-md);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .settings-card-desc {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+    .settings-card-chevron {
+      width: 20px;
+      height: 20px;
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+      transition: transform var(--duration-fast) var(--ease-out);
+    }
+    .settings-card.open .settings-card-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* Card body (collapsible) */
+    .settings-card-body {
+      display: none;
+      padding: 0 var(--sp-6) var(--sp-6);
+      border-top: 1px solid var(--divider);
+    }
+    .settings-card.open .settings-card-body {
+      display: block;
+    }
+
+    /* ── Setting Row ── */
+    .setting-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--sp-5);
+      padding: var(--sp-5) 0;
+      border-bottom: 1px solid var(--divider);
+    }
+    .setting-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .setting-row + .setting-row {
+      /* ensure top padding on subsequent rows */
+    }
+    .setting-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .setting-label {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+    }
+    .setting-hint {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      margin-top: 4px;
+      line-height: var(--leading-relaxed);
+    }
+    .setting-control {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+    }
+
+    /* ── Webhook Input Group ── */
+    .webhook-input-group {
+      display: flex;
+      gap: var(--sp-3);
+      width: 100%;
+      max-width: 480px;
+    }
+    .webhook-input-group .input {
+      flex: 1;
+      min-width: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+    }
+    .webhook-status {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-2);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      margin-top: var(--sp-2);
+    }
+    .webhook-status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .webhook-status.connected {
+      color: var(--success-500);
+    }
+    .webhook-status.connected .webhook-status-dot {
+      background: var(--success-500);
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+    }
+    .webhook-status.not-configured {
+      color: var(--text-tertiary);
+    }
+    .webhook-status.not-configured .webhook-status-dot {
+      background: var(--text-tertiary);
+    }
+
+    /* ── Coming Soon Badge ── */
+    .coming-soon-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+      color: var(--text-tertiary);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+
+    /* ── Radio Group ── */
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-3);
+    }
+    .radio-group-inline {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: var(--sp-4);
+    }
+    .radio-item {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      cursor: pointer;
+      user-select: none;
+    }
+    .radio-item input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .radio-circle {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border-hover);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--duration-fast) var(--ease-out);
+      flex-shrink: 0;
+    }
+    .radio-circle::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background: var(--accent-emerald);
+      border-radius: 50%;
+      transform: scale(0);
+      transition: transform var(--duration-fast) var(--ease-spring);
+    }
+    .radio-item input:checked + .radio-circle {
+      border-color: var(--accent-emerald);
+    }
+    .radio-item input:checked + .radio-circle::after {
+      transform: scale(1);
+    }
+    .radio-label {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+    }
+    .radio-item input:checked ~ .radio-label {
+      color: var(--text-primary);
+    }
+
+    /* ── Time Range Pickers ── */
+    .time-range {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+    }
+    .time-range .input {
+      width: 120px;
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+    .time-range-sep {
+      color: var(--text-tertiary);
+      font-size: var(--text-sm);
+    }
+
+    /* ── Severity Slider ── */
+    .severity-slider-wrap {
+      width: 100%;
+      max-width: 400px;
+    }
+    .severity-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(to right, var(--sev-low), var(--sev-medium), var(--sev-high), var(--sev-critical));
+      border-radius: var(--radius-full);
+      outline: none;
+      cursor: pointer;
+    }
+    .severity-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid var(--accent-emerald);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+      transition: transform var(--duration-fast) var(--ease-out);
+    }
+    .severity-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+    .severity-slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid var(--accent-emerald);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+    }
+    .severity-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: var(--sp-2);
+    }
+    .severity-label-item {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      text-align: center;
+      cursor: pointer;
+      transition: color var(--duration-fast) var(--ease-out);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+    }
+    .severity-label-item:hover,
+    .severity-label-item.active {
+      color: var(--text-primary);
+    }
+    .severity-label-item.active {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .severity-current {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--accent-emerald);
+      text-align: center;
+      margin-top: var(--sp-3);
+    }
+
+    /* ── API Key Display ── */
+    .api-key-display {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      padding: var(--sp-3) var(--sp-4);
+      max-width: 480px;
+    }
+    .api-key-text {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      user-select: all;
+    }
+    .api-key-text.masked {
+      letter-spacing: 2px;
+    }
+
+    /* ── Code Block ── */
+    .code-block {
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-top: var(--sp-4);
+    }
+    .code-block-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--sp-2) var(--sp-4);
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-default);
+    }
+    .code-block-lang {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+      color: var(--text-tertiary);
+    }
+    .code-block-body {
+      padding: var(--sp-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: 1.7;
+      color: var(--text-secondary);
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .code-block-body .comment {
+      color: var(--text-tertiary);
+    }
+    .code-block-body .keyword {
+      color: var(--accent-violet);
+    }
+    .code-block-body .string {
+      color: var(--accent-emerald);
+    }
+
+    /* ── Usage Stats ── */
+    .usage-stats {
+      display: flex;
+      gap: var(--sp-5);
+      margin-top: var(--sp-5);
+      flex-wrap: wrap;
+    }
+    .usage-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: var(--sp-3) var(--sp-5);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      min-width: 140px;
+    }
+    .usage-stat-value {
+      font-size: var(--text-xl);
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: var(--tracking-tight);
+    }
+    .usage-stat-label {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+
+    /* ── Repo Settings List ── */
+    .repo-settings-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-3);
+    }
+    .repo-setting-item {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-4);
+      padding: var(--sp-4) var(--sp-5);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      transition: border-color var(--duration-fast) var(--ease-out);
+    }
+    .repo-setting-item:hover {
+      border-color: var(--border-hover);
+    }
+    .repo-setting-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      background: rgba(var(--rgb-blue), 0.1);
+      color: var(--info-500);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .repo-setting-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+    .repo-setting-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .repo-setting-name {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .repo-setting-meta {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+    .repo-setting-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-4);
+      flex-shrink: 0;
+    }
+    .repo-setting-controls .select {
+      width: 100px;
+      padding: 6px 28px 6px 10px;
+      font-size: var(--text-xs);
+      background-position: right 8px center;
+    }
+
+    /* ── Empty State ── */
+    .settings-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: var(--sp-12) var(--sp-6);
+    }
+    .settings-empty-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--sp-4);
+      color: var(--text-tertiary);
+    }
+    .settings-empty-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+    .settings-empty-title {
+      font-size: var(--text-md);
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: var(--sp-1);
+    }
+    .settings-empty-text {
+      font-size: var(--text-sm);
+      color: var(--text-tertiary);
+      max-width: 320px;
+      line-height: var(--leading-relaxed);
+    }
+
+    /* ── Account Card ── */
+    .account-connected {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-4);
+      padding: var(--sp-4) var(--sp-5);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+    }
+    .account-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-emerald), var(--accent-blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-md);
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .account-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .account-name {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .account-provider {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+
+    /* ── Danger Zone ── */
+    .danger-zone {
+      margin-top: var(--sp-5);
+      padding: var(--sp-5);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: var(--radius-lg);
+      background: rgba(239, 68, 68, 0.04);
+    }
+    .danger-zone-title {
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--danger-500);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+      margin-bottom: var(--sp-2);
+    }
+    .danger-zone-desc {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      line-height: var(--leading-relaxed);
+      margin-bottom: var(--sp-4);
+    }
+
+    /* ── Save Bar ── */
+    .settings-save-bar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--sp-3);
+      margin-top: var(--sp-4);
+      padding-top: var(--sp-5);
+      border-top: 1px solid var(--divider);
+    }
+
+    /* ── Confirmation Modal Content ── */
+    .confirm-modal-text {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      line-height: var(--leading-relaxed);
+    }
+    .confirm-modal-input {
+      margin-top: var(--sp-4);
+    }
+    .confirm-modal-input .input {
+      width: 100%;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 767px) {
+      .setting-row {
+        flex-direction: column;
+        gap: var(--sp-3);
+      }
+      .setting-control {
+        width: 100%;
+      }
+      .webhook-input-group {
+        flex-direction: column;
+        max-width: 100%;
+      }
+      .repo-setting-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .repo-setting-controls {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .radio-group-inline {
+        flex-direction: column;
+      }
+      .usage-stats {
+        flex-direction: column;
+      }
+      .usage-stat {
+        min-width: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ TOP NAVIGATION ═══ -->
+<nav class="nav" id="topNav">
+  <a href="/dashboard" class="nav-logo">
+    <span class="nav-logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </span>
+    <span>Secrets Monitor</span>
+  </a>
+
+  <div class="nav-links">
+    <a href="/dashboard" class="nav-link">Dashboard</a>
+    <a href="/repos" class="nav-link">Repositories</a>
+    <a href="/scan-history" class="nav-link">Scan History</a>
+    <a href="/rules" class="nav-link">Rules</a>
+    <a href="/settings" class="nav-link active">Settings</a>
+  </div>
+
+  <div class="nav-user">
+    <!-- Search -->
+    <div class="dropdown" id="navSearchDropdown">
+      <button class="btn btn-icon btn-ghost" onclick="toggleDropdown('navSearchDropdown')" aria-label="Search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <div class="dropdown-menu" style="min-width:280px; padding:var(--sp-3);">
+        <div class="input-icon-wrapper">
+          <input type="text" class="input" placeholder="Search scans, repos, findings…" style="padding-left:36px;">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="dropdown" id="navNotifDropdown">
+      <button class="btn btn-icon btn-ghost" onclick="toggleDropdown('navNotifDropdown')" aria-label="Notifications" style="position:relative;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span style="position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--sev-critical);border-radius:50%;border:2px solid var(--bg-base);"></span>
+      </button>
+      <div class="dropdown-menu" style="min-width:300px;">
+        <div style="padding:var(--sp-2) var(--sp-3);font-size:var(--text-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--tracking-wide);color:var(--text-tertiary);">Notifications</div>
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-item">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div><div style="font-size:var(--text-sm);color:var(--text-primary);">3 new critical findings</div><div style="font-size:var(--text-xs);color:var(--text-tertiary);">2 minutes ago</div></div>
+        </div>
+        <div class="dropdown-item">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div><div style="font-size:var(--text-sm);color:var(--text-primary);">Scan completed for api-gateway</div><div style="font-size:var(--text-xs);color:var(--text-tertiary);">15 minutes ago</div></div>
+        </div>
+        <div class="dropdown-divider"></div>
+        <a href="/notifications" class="dropdown-item" style="justify-content:center;color:var(--text-link);font-weight:500;">View all notifications</a>
+      </div>
+    </div>
+
+    <!-- User menu -->
+    <div class="dropdown" id="navUserDropdown">
+      <div class="nav-user-trigger" onclick="toggleDropdown('navUserDropdown')">
+        <div class="nav-avatar">KA</div>
+        <span class="nav-username">Kaushik</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+      <div class="dropdown-menu">
+        <div style="padding:var(--sp-2) var(--sp-3);">
+          <div style="font-size:var(--text-sm);font-weight:600;color:var(--text-primary);">Kaushik</div>
+          <div style="font-size:var(--text-xs);color:var(--text-tertiary);">kaushik@example.com</div>
+        </div>
+        <div class="dropdown-divider"></div>
+        <a href="/profile" class="dropdown-item">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Profile
+        </a>
+        <a href="/settings" class="dropdown-item">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </a>
+        <div class="dropdown-divider"></div>
+        <a href="/logout" class="dropdown-item danger">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </a>
+      </div>
+    </div>
+
+    <!-- Mobile hamburger -->
+    <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileMenu()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile overlay + menu -->
+<div class="mobile-menu-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+<div class="mobile-menu" id="mobileMenu">
+  <a href="/dashboard" class="nav-link">Dashboard</a>
+  <a href="/repos" class="nav-link">Repositories</a>
+  <a href="/scan-history" class="nav-link">Scan History</a>
+  <a href="/rules" class="nav-link">Rules</a>
+  <a href="/settings" class="nav-link active">Settings</a>
+</div>
+
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Collapse sidebar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
+    </button>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-group-label">Main</div>
+    <a href="/dashboard" class="sidebar-item" data-label="Dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="/repos" class="sidebar-item" data-label="Repositories">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+      <span>Repositories</span>
+      <span class="sidebar-badge">12</span>
+    </a>
+    <a href="/scan-history" class="sidebar-item" data-label="Scan History">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+      <span>Scan History</span>
+    </a>
+
+    <div class="sidebar-group-label">Configuration</div>
+    <a href="/rules" class="sidebar-item" data-label="Rules">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>Rules</span>
+      <span class="sidebar-badge">24</span>
+    </a>
+    <a href="/integrations" class="sidebar-item" data-label="Integrations">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      <span>Integrations</span>
+    </a>
+    <a href="/settings" class="sidebar-item active" data-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="/docs" class="sidebar-item" data-label="Documentation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      <span>Docs</span>
+    </a>
+  </div>
+</aside>
+
+
+<!-- ═══ MAIN CONTENT ═══ -->
+<div class="page-wrapper has-sidebar">
+  <main class="page-content">
+
+    <!-- Page Header -->
+    <div class="settings-header">
+      <h1>Settings</h1>
+      <p>Manage your account, alerts, and preferences</p>
+    </div>
+
+    <div class="settings-layout">
+
+      <!-- ═══ A. ALERT CONFIGURATION ═══ -->
+      <div class="settings-card open" id="card-alert-config">
+        <div class="settings-card-header" onclick="toggleSettingsCard('card-alert-config')">
+          <div class="settings-card-icon emerald">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <div class="settings-card-title-wrap">
+            <div class="settings-card-title">Alert Configuration</div>
+            <div class="settings-card-desc">Configure webhook integrations and alert routing</div>
+          </div>
+          <svg class="settings-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="settings-card-body">
+
+          <!-- Slack Webhook -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5zm-5 0c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5zm2.5 5c-.83 0-1.5-.67-1.5-1.5v-1c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v1c0 .83-.67 1.5-1.5 1.5zm5 0c-.83 0-1.5-.67-1.5-1.5v-1c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v1c0 .83-.67 1.5-1.5 1.5zm-10 0c-.83 0-1.5-.67-1.5-1.5v-1c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v1c0 .83-.67 1.5-1.5 1.5zm10-10h-1.5V3.5c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5V5H9.5V3.5C9.5 2.67 8.83 2 8 2s-1.5.67-1.5 1.5V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/></svg>
+                Slack Webhook
+              </div>
+              <div class="setting-hint">Send alerts to a Slack channel via incoming webhook</div>
+            </div>
+          </div>
+          <div class="setting-row" style="padding-top:0; border-bottom:none;">
+            <div class="setting-info" style="width:100%;">
+              <div class="webhook-input-group">
+                <input type="text" class="input" id="slackWebhook" placeholder="https://hooks.slack.com/services/..." value="">
+                <button class="btn btn-sm btn-secondary" onclick="testWebhook('slack')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                  Test
+                </button>
+              </div>
+              <div class="webhook-status connected" id="slackWebhookStatus">
+                <span class="webhook-status-dot"></span>
+                Connected — last tested 2 minutes ago
+              </div>
+            </div>
+          </div>
+
+          <!-- Discord Webhook -->
+          <div class="setting-row" style="border-top: 1px solid var(--divider); margin-top: var(--sp-4); padding-top: var(--sp-5);">
+            <div class="setting-info">
+              <div class="setting-label">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+                Discord Webhook
+              </div>
+              <div class="setting-hint">Send alerts to a Discord channel via webhook</div>
+            </div>
+          </div>
+          <div class="setting-row" style="padding-top:0; border-bottom:none;">
+            <div class="setting-info" style="width:100%;">
+              <div class="webhook-input-group">
+                <input type="text" class="input" id="discordWebhook" placeholder="https://discord.com/api/webhooks/000000000000000000/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                <button class="btn btn-sm btn-secondary" onclick="testWebhook('discord')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                  Test
+                </button>
+              </div>
+              <div class="webhook-status not-configured" id="discordWebhookStatus">
+                <span class="webhook-status-dot"></span>
+                Not configured
+              </div>
+            </div>
+          </div>
+
+          <!-- Critical Only Toggle -->
+          <div class="setting-row" style="border-top: 1px solid var(--divider); margin-top: var(--sp-4); padding-top: var(--sp-5);">
+            <div class="setting-info">
+              <div class="setting-label">Critical Only Mode</div>
+              <div class="setting-hint">When enabled, only CRITICAL severity findings will trigger alerts</div>
+            </div>
+            <div class="setting-control">
+              <label class="toggle">
+                <input type="checkbox" id="criticalOnlyToggle">
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Email Alerts Toggle (Coming Soon) -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">
+                Email Alerts
+                <span class="coming-soon-badge">Coming soon</span>
+              </div>
+              <div class="setting-hint">Receive alert summaries via email</div>
+            </div>
+            <div class="setting-control">
+              <label class="toggle">
+                <input type="checkbox" id="emailAlertsToggle" disabled>
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Save -->
+          <div class="settings-save-bar">
+            <button class="btn btn-secondary" onclick="resetAlertConfig()">Reset</button>
+            <button class="btn btn-primary" onclick="saveAlertConfig()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save Changes
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- ═══ B. PER-REPOSITORY SETTINGS ═══ -->
+      <div class="settings-card open" id="card-repo-settings">
+        <div class="settings-card-header" onclick="toggleSettingsCard('card-repo-settings')">
+          <div class="settings-card-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+          </div>
+          <div class="settings-card-title-wrap">
+            <div class="settings-card-title">Per-Repository Settings</div>
+            <div class="settings-card-desc">Configure scanning and webhooks for each monitored repository</div>
+          </div>
+          <svg class="settings-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="settings-card-body">
+
+          <div class="repo-settings-list" id="repoSettingsList">
+
+            <!-- Repo 1 -->
+            <div class="repo-setting-item">
+              <div class="repo-setting-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+              </div>
+              <div class="repo-setting-info">
+                <div class="repo-setting-name">acme/api-gateway</div>
+                <div class="repo-setting-meta">Last scanned 12 minutes ago · 3 findings</div>
+              </div>
+              <div class="repo-setting-controls">
+                <label class="toggle">
+                  <input type="checkbox" checked data-repo="acme/api-gateway">
+                  <span class="toggle-track"></span>
+                </label>
+                <select class="select" data-repo="acme/api-gateway">
+                  <option value="1h">1h</option>
+                  <option value="6h" selected>6h</option>
+                  <option value="12h">12h</option>
+                  <option value="24h">24h</option>
+                </select>
+                <span class="badge badge-sm badge-success" style="padding:3px 8px;">Webhook</span>
+              </div>
+            </div>
+
+            <!-- Repo 2 -->
+            <div class="repo-setting-item">
+              <div class="repo-setting-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+              </div>
+              <div class="repo-setting-info">
+                <div class="repo-setting-name">acme/auth-service</div>
+                <div class="repo-setting-meta">Last scanned 1 hour ago · 0 findings</div>
+              </div>
+              <div class="repo-setting-controls">
+                <label class="toggle">
+                  <input type="checkbox" checked data-repo="acme/auth-service">
+                  <span class="toggle-track"></span>
+                </label>
+                <select class="select" data-repo="acme/auth-service">
+                  <option value="1h">1h</option>
+                  <option value="6h">6h</option>
+                  <option value="12h" selected>12h</option>
+                  <option value="24h">24h</option>
+                </select>
+                <button class="btn btn-sm btn-ghost" onclick="setupWebhook('acme/auth-service')">Setup</button>
+              </div>
+            </div>
+
+            <!-- Repo 3 -->
+            <div class="repo-setting-item">
+              <div class="repo-setting-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+              </div>
+              <div class="repo-setting-info">
+                <div class="repo-setting-name">acme/payment-processor</div>
+                <div class="repo-setting-meta">Last scanned 3 hours ago · 7 findings</div>
+              </div>
+              <div class="repo-setting-controls">
+                <label class="toggle">
+                  <input type="checkbox" data-repo="acme/payment-processor">
+                  <span class="toggle-track"></span>
+                </label>
+                <select class="select" data-repo="acme/payment-processor">
+                  <option value="1h">1h</option>
+                  <option value="6h">6h</option>
+                  <option value="12h">12h</option>
+                  <option value="24h" selected>24h</option>
+                </select>
+                <span class="badge badge-sm badge-success" style="padding:3px 8px;">Webhook</span>
+              </div>
+            </div>
+
+            <!-- Repo 4 -->
+            <div class="repo-setting-item">
+              <div class="repo-setting-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+              </div>
+              <div class="repo-setting-info">
+                <div class="repo-setting-name">acme/frontend-app</div>
+                <div class="repo-setting-meta">Last scanned 6 hours ago · 1 finding</div>
+              </div>
+              <div class="repo-setting-controls">
+                <label class="toggle">
+                  <input type="checkbox" checked data-repo="acme/frontend-app">
+                  <span class="toggle-track"></span>
+                </label>
+                <select class="select" data-repo="acme/frontend-app">
+                  <option value="1h">1h</option>
+                  <option value="6h" selected>6h</option>
+                  <option value="12h">12h</option>
+                  <option value="24h">24h</option>
+                </select>
+                <button class="btn btn-sm btn-ghost" onclick="setupWebhook('acme/frontend-app')">Setup</button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Empty state (hidden by default, shown when no repos) -->
+          <!--
+          <div class="settings-empty" id="repoSettingsEmpty">
+            <div class="settings-empty-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+            </div>
+            <div class="settings-empty-title">No repositories monitored</div>
+            <div class="settings-empty-text">Connect a GitHub repository to start scanning for secrets and hygiene issues.</div>
+            <a href="/repos" class="btn btn-primary" style="margin-top: var(--sp-4);">Add Repository</a>
+          </div>
+          -->
+
+          <div class="settings-save-bar">
+            <button class="btn btn-secondary" onclick="resetRepoSettings()">Reset</button>
+            <button class="btn btn-primary" onclick="saveRepoSettings()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save Changes
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- ═══ C. NOTIFICATION PREFERENCES ═══ -->
+      <div class="settings-card open" id="card-notif-prefs">
+        <div class="settings-card-header" onclick="toggleSettingsCard('card-notif-prefs')">
+          <div class="settings-card-icon violet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <div class="settings-card-title-wrap">
+            <div class="settings-card-title">Notification Preferences</div>
+            <div class="settings-card-desc">Control when and how you receive alerts</div>
+          </div>
+          <svg class="settings-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="settings-card-body">
+
+          <!-- Alert Frequency -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Alert Frequency</div>
+              <div class="setting-hint">Choose how often you want to be notified about findings</div>
+            </div>
+          </div>
+          <div class="setting-row" style="padding-top:0; border-bottom:none;">
+            <div class="setting-info" style="width:100%;">
+              <div class="radio-group">
+                <label class="radio-item">
+                  <input type="radio" name="alertFrequency" value="immediate" checked>
+                  <span class="radio-circle"></span>
+                  <span class="radio-label">Immediate — Send alerts as soon as findings are detected</span>
+                </label>
+                <label class="radio-item">
+                  <input type="radio" name="alertFrequency" value="daily">
+                  <span class="radio-circle"></span>
+                  <span class="radio-label">Daily digest — One summary email per day at 9:00 AM</span>
+                </label>
+                <label class="radio-item">
+                  <input type="radio" name="alertFrequency" value="weekly">
+                  <span class="radio-circle"></span>
+                  <span class="radio-label">Weekly summary — One summary per week on Monday</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quiet Hours -->
+          <div class="setting-row" style="border-top: 1px solid var(--divider); margin-top: var(--sp-4); padding-top: var(--sp-5);">
+            <div class="setting-info">
+              <div class="setting-label">Quiet Hours</div>
+              <div class="setting-hint">Pause non-critical notifications during specified hours</div>
+            </div>
+            <div class="setting-control">
+              <label class="toggle">
+                <input type="checkbox" id="quietHoursToggle" onchange="toggleQuietHours()">
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+          </div>
+          <div class="setting-row" style="padding-top:0; border-bottom:none;" id="quietHoursTimeRange" style="display:none;">
+            <div class="setting-info" style="width:100%;">
+              <div class="time-range">
+                <input type="time" class="input" id="quietHoursFrom" value="22:00">
+                <span class="time-range-sep">to</span>
+                <input type="time" class="input" id="quietHoursTo" value="08:00">
+              </div>
+            </div>
+          </div>
+
+          <!-- Severity Threshold -->
+          <div class="setting-row" style="border-top: 1px solid var(--divider); margin-top: var(--sp-4); padding-top: var(--sp-5);">
+            <div class="setting-info">
+              <div class="setting-label">Severity Threshold</div>
+              <div class="setting-hint">Only alert on findings at or above the selected severity level</div>
+            </div>
+          </div>
+          <div class="setting-row" style="padding-top:0; border-bottom:none;">
+            <div class="setting-info" style="width:100%;">
+              <div class="severity-slider-wrap">
+                <input type="range" class="severity-slider" id="severitySlider" min="0" max="3" value="1" step="1" oninput="updateSeverityLabel(this.value)">
+                <div class="severity-labels">
+                  <span class="severity-label-item" data-value="0" onclick="setSeverity(0)">All</span>
+                  <span class="severity-label-item" data-value="1" onclick="setSeverity(1)">MEDIUM+</span>
+                  <span class="severity-label-item" data-value="2" onclick="setSeverity(2)">HIGH+</span>
+                  <span class="severity-label-item" data-value="3" onclick="setSeverity(3)">CRITICAL</span>
+                </div>
+                <div class="severity-current" id="severityCurrent">Alert on MEDIUM and above</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Save -->
+          <div class="settings-save-bar">
+            <button class="btn btn-secondary" onclick="resetNotifPrefs()">Reset</button>
+            <button class="btn btn-primary" onclick="saveNotifPrefs()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save Changes
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- ═══ D. API ACCESS ═══ -->
+      <div class="settings-card open" id="card-api-access">
+        <div class="settings-card-header" onclick="toggleSettingsCard('card-api-access')">
+          <div class="settings-card-icon teal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="20" height="12" rx="2" ry="2"/><path d="M6 9V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/></svg>
+          </div>
+          <div class="settings-card-title-wrap">
+            <div class="settings-card-title">API Access</div>
+            <div class="settings-card-desc">Manage your API key and view endpoint documentation</div>
+          </div>
+          <svg class="settings-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="settings-card-body">
+
+          <!-- API Key -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">API Key</div>
+              <div class="setting-hint">Use this key to authenticate API requests</div>
+            </div>
+          </div>
+          <div class="setting-row" style="padding-top:0; border-bottom:none;">
+            <div class="setting-info" style="width:100%;">
+              <div class="api-key-display">
+                <span class="api-key-text masked" id="apiKeyText">sk_live_••••••••••••••••••••••••</span>
+                <button class="btn btn-sm btn-ghost" onclick="toggleApiKeyVisibility()" id="toggleKeyBtn" aria-label="Show API key">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+                <button class="btn btn-sm btn-ghost" onclick="copyApiKey()" aria-label="Copy API key">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+              </div>
+              <div style="margin-top: var(--sp-3);">
+                <button class="btn btn-sm btn-secondary" onclick="openRegenerateModal()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                  Regenerate Key
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Usage Stats -->
+          <div class="usage-stats">
+            <div class="usage-stat">
+              <div class="usage-stat-value">1,247</div>
+              <div class="usage-stat-label">Requests this month</div>
+            </div>
+            <div class="usage-stat">
+              <div class="usage-stat-value">8,753</div>
+              <div class="usage-stat-label">Rate limit remaining</div>
+            </div>
+            <div class="usage-stat">
+              <div class="usage-stat-value">10,000</div>
+              <div class="usage-stat-label">Monthly limit</div>
+            </div>
+          </div>
+
+          <!-- API Documentation -->
+          <div class="setting-row" style="border-top: 1px solid var(--divider); margin-top: var(--sp-5); padding-top: var(--sp-5);">
+            <div class="setting-info">
+              <div class="setting-label">API Endpoints</div>
+              <div class="setting-hint">Example requests using your API key</div>
+            </div>
+          </div>
+          <div class="setting-row" style="padding-top:0; border-bottom:none;">
+            <div class="setting-info" style="width:100%;">
+              <div class="code-block">
+                <div class="code-block-header">
+                  <span class="code-block-lang">cURL</span>
+                  <button class="btn btn-sm btn-ghost" onclick="copyCode('codeListScans')" style="padding:2px 8px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    Copy
+                  </button>
+                </div>
+                <div class="code-block-body" id="codeListScans"><span class="comment"># List all scans for a repository</span>
+curl -X GET <span class="string">"https://api.secretsmonitor.io/v1/scans?repo=acme/api-gateway"</span> \
+  -H <span class="string">"Authorization: Bearer sk_live_xxxxxxxxxxxxxxxx"</span> \
+  -H <span class="string">"Content-Type: application/json"</span></div>
+              </div>
+
+              <div class="code-block" style="margin-top: var(--sp-3);">
+                <div class="code-block-header">
+                  <span class="code-block-lang">cURL</span>
+                  <button class="btn btn-sm btn-ghost" onclick="copyCode('codeTriggerScan')" style="padding:2px 8px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    Copy
+                  </button>
+                </div>
+                <div class="code-block-body" id="codeTriggerScan"><span class="comment"># Trigger a new scan</span>
+curl -X POST <span class="string">"https://api.secretsmonitor.io/v1/scans"</span> \
+  -H <span class="string">"Authorization: Bearer sk_live_xxxxxxxxxxxxxxxx"</span> \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"repo": "acme/api-gateway", "branch": "main"}'</span></div>
+              </div>
+
+              <div class="code-block" style="margin-top: var(--sp-3);">
+                <div class="code-block-header">
+                  <span class="code-block-lang">cURL</span>
+                  <button class="btn btn-sm btn-ghost" onclick="copyCode('codeListFindings')" style="padding:2px 8px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    Copy
+                  </button>
+                </div>
+                <div class="code-block-body" id="codeListFindings"><span class="comment"># Get findings for a scan</span>
+curl -X GET <span class="string">"https://api.secretsmonitor.io/v1/scans/42/findings?severity=critical"</span> \
+  -H <span class="string">"Authorization: Bearer sk_live_xxxxxxxxxxxxxxxx"</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- ═══ E. ACCOUNT ═══ -->
+      <div class="settings-card open" id="card-account">
+        <div class="settings-card-header" onclick="toggleSettingsCard('card-account')">
+          <div class="settings-card-icon red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="settings-card-title-wrap">
+            <div class="settings-card-title">Account</div>
+            <div class="settings-card-desc">Manage your connected account and data</div>
+          </div>
+          <svg class="settings-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="settings-card-body">
+
+          <!-- Connected GitHub Account -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Connected Account</div>
+              <div class="setting-hint">Your account is linked via GitHub OAuth</div>
+            </div>
+          </div>
+          <div class="setting-row" style="padding-top:0; border-bottom:none;">
+            <div class="setting-info" style="width:100%;">
+              <div class="account-connected">
+                <div class="account-avatar">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                </div>
+                <div class="account-info">
+                  <div class="account-name">Kaushik</div>
+                  <div class="account-provider">Connected via GitHub · @kaushik</div>
+                </div>
+                <button class="btn btn-sm btn-secondary" onclick="reconnectGitHub()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><

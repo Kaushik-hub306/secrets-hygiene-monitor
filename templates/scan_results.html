@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scan #{{ scan.id }} — {{ scan.repo_name }} — Secrets Hygiene Monitor</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}">
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       SCAN RESULTS — Page-Specific Styles
+       ═══════════════════════════════════════════════════════ */
+
+    /* ── Breadcrumb ── */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: var(--sp-4) 0;
+      font-size: var(--text-sm);
+      flex-wrap: wrap;
+    }
+    .breadcrumb a {
+      color: var(--text-tertiary);
+      text-decoration: none;
+      transition: color var(--duration-fast) var(--ease-out);
+    }
+    .breadcrumb a:hover {
+      color: var(--accent-emerald);
+    }
+    .breadcrumb-sep {
+      color: var(--text-tertiary);
+      opacity: 0.4;
+      font-size: 10px;
+    }
+    .breadcrumb-current {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* ── Scan Summary Card ── */
+    .scan-summary {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-xl);
+      padding: var(--sp-6);
+      margin-bottom: var(--sp-5);
+    }
+    .scan-summary-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--sp-4);
+      margin-bottom: var(--sp-5);
+      padding-bottom: var(--sp-5);
+      border-bottom: 1px solid var(--divider);
+    }
+    .scan-id-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text-tertiary);
+      background: var(--bg-elevated);
+      padding: 4px 10px;
+      border-radius: var(--radius-md);
+    }
+    .scan-id-badge strong {
+      color: var(--text-primary);
+    }
+    .scan-meta-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--sp-6);
+    }
+    .scan-meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .scan-meta-label {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+    }
+    .scan-meta-value {
+      font-size: var(--text-sm);
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    .scan-meta-value a {
+      color: var(--text-link);
+      text-decoration: none;
+    }
+    .scan-meta-value a:hover {
+      color: var(--accent-teal);
+      text-decoration: underline;
+    }
+
+    /* Triggered-by badge */
+    .badge-trigger-manual {
+      color: var(--accent-blue);
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+    .badge-trigger-webhook {
+      color: var(--accent-violet);
+      background: rgba(139, 92, 246, 0.1);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+    }
+    .badge-trigger-scheduled {
+      color: var(--accent-teal);
+      background: rgba(20, 184, 166, 0.1);
+      border: 1px solid rgba(20, 184, 166, 0.2);
+    }
+
+    /* Findings count display */
+    .findings-count-wrap {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-8);
+      flex-wrap: wrap;
+    }
+    .findings-total {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 80px;
+    }
+    .findings-total-number {
+      font-size: 48px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: var(--tracking-tight);
+      color: var(--text-primary);
+    }
+    .findings-total-label {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+      margin-top: var(--sp-1);
+    }
+    .severity-breakdown {
+      display: flex;
+      gap: var(--sp-4);
+      flex-wrap: wrap;
+    }
+    .severity-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--sp-1);
+      padding: var(--sp-3) var(--sp-5);
+      border-radius: var(--radius-lg);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      min-width: 72px;
+    }
+    .severity-item-count {
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      line-height: 1;
+    }
+    .severity-item.critical .severity-item-count { color: var(--sev-critical); }
+    .severity-item.high .severity-item-count { color: var(--sev-high); }
+    .severity-item.medium .severity-item-count { color: var(--sev-medium); }
+    .severity-item-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+      color: var(--text-tertiary);
+    }
+    .scan-duration {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      font-size: var(--text-sm);
+      color: var(--text-tertiary);
+      margin-top: var(--sp-4);
+    }
+
+    /* ── Action Bar ── */
+    .action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--sp-3);
+      margin-bottom: var(--sp-5);
+    }
+    .action-bar-left {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      flex-wrap: wrap;
+    }
+    .action-bar-right {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+    }
+
+    /* ── Filter Bar ── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      padding: var(--sp-4);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-xl);
+      margin-bottom: var(--sp-5);
+      flex-wrap: wrap;
+    }
+    .filter-search {
+      flex: 1;
+      min-width: 200px;
+    }
+    .filter-bar .select {
+      width: auto;
+      min-width: 140px;
+    }
+    .filter-count {
+      font-size: var(--text-sm);
+      color: var(--text-tertiary);
+      white-space: nowrap;
+      margin-left: auto;
+    }
+    .filter-count strong {
+      color: var(--text-secondary);
+    }
+
+    /* ── Findings List ── */
+    .findings-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-3);
+      margin-bottom: var(--sp-6);
+    }
+
+    /* ── Finding Card ── */
+    .finding-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: border-color var(--duration-fast) var(--ease-out),
+                  box-shadow var(--duration-fast) var(--ease-out);
+    }
+    .finding-card:hover {
+      border-color: var(--border-hover);
+    }
+    /* Color-coded left border */
+    .finding-card.severity-critical { border-left: 3px solid var(--sev-critical); }
+    .finding-card.severity-high { border-left: 3px solid var(--sev-high); }
+    .finding-card.severity-medium { border-left: 3px solid var(--sev-medium); }
+    .finding-card.severity-low { border-left: 3px solid var(--sev-low); }
+
+    /* Finding header (always visible) */
+    .finding-header {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      padding: var(--sp-4) var(--sp-5);
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--duration-fast) var(--ease-out);
+    }
+    .finding-header:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .finding-severity {
+      flex-shrink: 0;
+    }
+    .finding-rule {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--text-primary);
+      flex-shrink: 0;
+    }
+    .finding-location {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      margin-left: auto;
+      flex-shrink: 1;
+      min-width: 0;
+    }
+    .finding-location-path {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-secondary);
+    }
+    .finding-location-line {
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+    }
+    .finding-location-line::before {
+      content: ":";
+    }
+    .finding-expand-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+      transition: transform var(--duration-fast) var(--ease-out);
+    }
+    .finding-card.expanded .finding-expand-icon {
+      transform: rotate(180deg);
+    }
+
+    /* Finding body (expandable) */
+    .finding-body {
+      display: none;
+      padding: 0 var(--sp-5) var(--sp-5);
+      border-top: 1px solid var(--divider);
+    }
+    .finding-card.expanded .finding-body {
+      display: block;
+    }
+    .finding-detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-4);
+      padding-top: var(--sp-4);
+    }
+    .finding-detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-1);
+    }
+    .finding-detail-item.full-width {
+      grid-column: 1 / -1;
+    }
+    .finding-detail-label {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+      color: var(--text-tertiary);
+    }
+    .finding-detail-value {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      line-height: var(--leading-relaxed);
+    }
+
+    /* Secret display */
+    .secret-display {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: var(--sp-2) var(--sp-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+    }
+    .secret-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--sev-critical);
+    }
+    .secret-text.revealed {
+      color: var(--text-primary);
+      word-break: break-all;
+      white-space: normal;
+    }
+    .secret-toggle {
+      flex-shrink: 0;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+      color: var(--text-tertiary);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--duration-fast) var(--ease-out);
+    }
+    .secret-toggle:hover {
+      color: var(--text-secondary);
+      border-color: var(--border-hover);
+    }
+
+    /* Match context (code diff style) */
+    .match-context {
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .match-context-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--sp-2) var(--sp-3);
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-default);
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .match-context-code {
+      padding: var(--sp-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+    .match-context-code .line-highlight {
+      background: var(--sev-critical-bg);
+      display: block;
+      margin: 0 calc(-1 * var(--sp-3));
+      padding: 0 var(--sp-3);
+    }
+    .match-context-code .line-num {
+      color: var(--text-tertiary);
+      opacity: 0.5;
+      margin-right: var(--sp-3);
+      user-select: none;
+    }
+
+    /* Finding actions */
+    .finding-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      margin-top: var(--sp-4);
+      padding-top: var(--sp-4);
+      border-top: 1px solid var(--divider);
+    }
+
+    /* ── Empty State (No Findings) ── */
+    .empty-findings {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: var(--sp-16) var(--sp-6);
+    }
+    .empty-checkmark {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--success-bg);
+      border: 2px solid rgba(16, 185, 129, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--sp-6);
+      animation: checkmark-pop 0.5s var(--ease-spring) 0.2s both;
+    }
+    .empty-checkmark svg {
+      width: 36px;
+      height: 36px;
+      stroke: var(--success-500);
+      stroke-width: 2.5;
+      fill: none;
+      stroke-dasharray: 50;
+      stroke-dashoffset: 50;
+      animation: draw-check 0.6s var(--ease-out) 0.5s forwards;
+    }
+    @keyframes checkmark-pop {
+      0% { transform: scale(0); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes draw-check {
+      to { stroke-dashoffset: 0; }
+    }
+    .empty-findings-title {
+      font-size: var(--text-xl);
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: var(--sp-2);
+    }
+    .empty-findings-text {
+      font-size: var(--text-sm);
+      color: var(--text-tertiary);
+      max-width: 360px;
+      line-height: var(--leading-relaxed);
+    }
+
+    /* ── Pagination ── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--sp-2);
+      padding-top: var(--sp-4);
+      border-top: 1px solid var(--divider);
+    }
+    .page-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      height: 36px;
+      padding: 0 var(--sp-3);
+      border-radius: var(--radius-md);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      cursor: pointer;
+      transition: all var(--duration-fast) var(--ease-out);
+      text-decoration: none;
+    }
+    .page-btn:hover:not(.active):not(.disabled) {
+      background: var(--bg-elevated);
+      border-color: var(--border-hover);
+      color: var(--text-primary);
+    }
+    .page-btn.active {
+      background: rgba(var(--rgb-emerald), 0.12);
+      border-color: rgba(var(--rgb-emerald), 0.3);
+      color: var(--accent-emerald);
+    }
+    .page-btn.disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .page-btn-icon {
+      padding: 0;
+      width: 36px;
+    }
+    .page-ellipsis {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      color: var(--text-tertiary);
+      font-size: var(--text-sm);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 767px) {
+      .scan-summary-top {
+        flex-direction: column;
+      }
+      .findings-count-wrap {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--sp-4);
+      }
+      .findings-total-number {
+        font-size: 36px;
+      }
+      .severity-breakdown {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .finding-detail-grid {
+        grid-template-columns: 1fr;
+      }
+      .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .filter-search {
+        min-width: 0;
+      }
+      .filter-count {
+        margin-left: 0;
+        text-align: center;
+      }
+      .finding-header {
+        flex-wrap: wrap;
+      }
+      .finding-location {
+        width: 100%;
+        margin-left: 0;
+        margin-top: var(--sp-1);
+        order: 4;
+      }
+      .action-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .action-bar-left {
+        justify-content: center;
+      }
+      .action-bar-right {
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ TOP NAVIGATION ═══ -->
+<nav class="nav" id="topNav">
+  <a href="/dashboard" class="nav-logo">
+    <span class="nav-logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </span>
+    <span>Secrets Monitor</span>
+  </a>
+
+  <div class="nav-links">
+    <a href="/dashboard" class="nav-link">Dashboard</a>
+    <a href="/repos" class="nav-link">Repositories</a>
+    <a href="/scan-history" class="nav-link active">Scan History</a>
+    <a href="/rules" class="nav-link">Rules</a>
+    <a href="/settings" class="nav-link">Settings</a>
+  </div>
+
+  <div class="nav-user">
+    <!-- Search -->
+    <div class="dropdown" id="navSearchDropdown">
+      <button class="btn btn-icon btn-ghost" onclick="toggleDropdown('navSearchDropdown')" aria-label="Search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <div class="dropdown-menu" style="min-width:280px; padding:var(--sp-3);">
+        <div class="input-icon-wrapper">
+          <input type="text" class="input" placeholder="Search scans, repos, findings…" style="padding-left:36px;">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="dropdown" id="navNotifDropdown">
+      <button class="btn btn-icon btn-ghost" onclick="toggleDropdown('navNotifDropdown')" aria-label="Notifications" style="position:relative;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span style="position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--sev-critical);border-radius:50%;border:2px solid var(--bg-base);"></span>
+      </button>
+      <div class="dropdown-menu" style="min-width:300px;">
+        <div style="padding:var(--sp-2) var(--sp-3);font-size:var(--text-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--tracking-wide);color:var(--text-tertiary);">Notifications</div>
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-item">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div><div style="font-size:var(--text-sm);color:var(--text-primary);">3 new critical findings</div><div style="font-size:var(--text-xs);color:var(--text-tertiary);">2 minutes ago</div></div>
+        </div>
+        <div class="dropdown-item">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div><div style="font-size:var(--text-sm);color:var(--text-primary);">Scan completed for api-gateway</div><div style="font-size:var(--text-xs);color:var(--text-tertiary);">15 minutes ago</div></div>
+        </div>
+        <div class="dropdown-divider"></div>
+        <a href="/notifications" class="dropdown-item" style="justify-content:center;color:var(--text-link);font-weight:500;">View all notifications</a>
+      </div>
+    </div>
+
+    <!-- User menu -->
+    <div class="dropdown" id="navUserDropdown">
+      <div class="nav-user-trigger" onclick="toggleDropdown('navUserDropdown')">
+        <div class="nav-avatar">KA</div>
+        <span class="nav-username">Kaushik</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+      <div class="dropdown-menu">
+        <div style="padding:var(--sp-2) var(--sp-3);">
+          <div style="font-size:var(--text-sm);font-weight:600;color:var(--text-primary);">Kaushik</div>
+          <div style="font-size:var(--text-xs);color:var(--text-tertiary);">kaushik@example.com</div>
+        </div>
+        <div class="dropdown-divider"></div>
+        <a href="/profile" class="dropdown-item">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Profile
+        </a>
+        <a href="/settings" class="dropdown-item">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </a>
+        <div class="dropdown-divider"></div>
+        <a href="/logout" class="dropdown-item danger">
+          <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </a>
+      </div>
+    </div>
+
+    <!-- Mobile hamburger -->
+    <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileMenu()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile overlay + menu -->
+<div class="mobile-menu-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+<div class="mobile-menu" id="mobileMenu">
+  <a href="/dashboard" class="nav-link">Dashboard</a>
+  <a href="/repos" class="nav-link">Repositories</a>
+  <a href="/scan-history" class="nav-link active">Scan History</a>
+  <a href="/rules" class="nav-link">Rules</a>
+  <a href="/settings" class="nav-link">Settings</a>
+</div>
+
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Collapse sidebar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
+    </button>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-group-label">Main</div>
+    <a href="/dashboard" class="sidebar-item" data-label="Dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="/repos" class="sidebar-item" data-label="Repositories">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+      <span>Repositories</span>
+      <span class="sidebar-badge">12</span>
+    </a>
+    <a href="/scan-history" class="sidebar-item active" data-label="Scan History">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+      <span>Scan History</span>
+    </a>
+
+    <div class="sidebar-group-label">Configuration</div>
+    <a href="/rules" class="sidebar-item" data-label="Rules">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>Rules</span>
+      <span class="sidebar-badge">24</span>
+    </a>
+    <a href="/integrations" class="sidebar-item" data-label="Integrations">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      <span>Integrations</span>
+    </a>
+    <a href="/settings" class="sidebar-item" data-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="/docs" class="sidebar-item" data-label="Documentation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      <span>Docs</span>
+    </a>
+  </div>
+</aside>
+
+
+<!-- ═══ MAIN CONTENT ═══ -->
+<div class="page-wrapper has-sidebar">
+  <main class="page-content">
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/dashboard">Dashboard</a>
+      <span class="breadcrumb-sep">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </span>
+      <a href="/repos">Repositories</a>
+      <span class="breadcrumb-sep">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </span>
+      <a href="/repo/{{ scan.repo_id }}">{{ scan.repo_name }}</a>
+      <span class="breadcrumb-sep">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </span>
+      <span class="breadcrumb-current">Scan #{{ scan.id }}</span>
+    </nav>
+
+    <!-- Scan Summary Card -->
+    <div class="scan-summary">
+      <div class="scan-summary-top">
+        <div>
+          <div class="scan-id-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Scan <strong>#{{ scan.id }}</strong>
+          </div>
+          <div class="scan-meta-grid" style="margin-top: var(--sp-3);">
+            <div class="scan-meta-item">
+              <span class="scan-meta-label">Repository</span>
+              <span class="scan-meta-value"><a href="https://github.com/{{ scan.repo_name }}" target="_blank" rel="noopener">{{ scan.repo_name }}</a></span>
+            </div>
+            <div class="scan-meta-item">
+              <span class="scan-meta-label">Branch</span>
+              <span class="scan-meta-value">{{ scan.branch }}</span>
+            </div>
+            <div class="scan-meta-item">
+              <span class="scan-meta-label">Scan Time</span>
+              <span class="scan-meta-value">{{ scan.scan_time }}</span>
+            </div>
+            <div class="scan-meta-item">
+              <span class="scan-meta-label">Triggered By</span>
+              <span style="margin-top: 2px;">
+                {% if scan.triggered_by == 'manual' %}
+                  <span class="badge badge-sm badge-trigger-manual">Manual</span>
+                {% elif scan.triggered_by == 'webhook' %}
+                  <span class="badge badge-sm badge-trigger-webhook">Webhook</span>
+                {% elif scan.triggered_by == 'scheduled' %}
+                  <span class="badge badge-sm badge-trigger-scheduled">Scheduled</span>
+                {% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="findings-count-wrap">
+        <div class="findings-total">
+          <div class="findings-total-number">{{ scan.total_findings }}</div>
+          <div class="findings-total-label">Total Findings</div>
+        </div>
+        <div class="severity-breakdown">
+          <div class="severity-item critical">
+            <div class="severity-item-count">{{ scan.critical_count }}</div>
+            <div class="severity-item-label">Critical</div>
+          </div>
+          <div class="severity-item high">
+            <div class="severity-item-count">{{ scan.high_count }}</div>
+            <div class="severity-item-label">High</div>
+          </div>
+          <div class="severity-item medium">
+            <div class="severity-item-count">{{ scan.medium_count }}</div>
+            <div class="severity-item-label">Medium</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scan-duration">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Scan completed in {{ scan.duration }}
+      </div>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="action-bar">
+      <div class="action-bar-left">
+        <button class="btn btn-primary" onclick="rescanRepo('{{ scan.repo_id }}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+          Rescan
+        </button>
+        <button class="btn btn-secondary" onclick="exportFindings('json', '{{ scan.id }}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export JSON
+        </button>
+        <button class="btn btn-secondary" onclick="exportFindings('csv', '{{ scan.id }}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+      <div class="action-bar-right">
+        <a href="/repo/{{ scan.repo_id }}" class="btn btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+          Back to Repo
+        </a>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <div class="filter-search input-icon-wrapper">
+        <input type="text" class="input" id="findingSearch" placeholder="Filter by file, rule, or secret…" style="padding-left:36px;" oninput="filterFindings()">
+        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </div>
+      <select class="select" id="severityFilter" onchange="filterFindings()">
+        <option value="all">All Severities</option>
+        <option value="critical">CRITICAL</option>
+        <option value="high">HIGH</option>
+        <option value="medium">MEDIUM</option>
+      </select>
+      <select class="select" id="sortFilter" onchange="filterFindings()">
+        <option value="severity">Sort: Severity</option>
+        <option value="file">Sort: File</option>
+        <option value="line">Sort: Line</option>
+        <option value="date">Sort: Date</option>
+      </select>
+      <span class="filter-count" id="resultsCount">Showing <strong>{{ scan.total_findings }}</strong> findings</span>
+    </div>
+
+    <!-- Findings List -->
+    {% if scan.findings and scan.findings|length > 0 %}
+    <div class="findings-list" id="findingsList">
+
+      {% for finding in scan.findings %}
+      <div class="finding-card severity-{{ finding.severity|lower }}" data-severity="{{ finding.severity|lower }}" data-rule="{{ finding.rule_name|lower }}" data-file="{{ finding.file_path|lower }}" id="finding-{{ finding.id }}">
+        <div class="finding-header" onclick="toggleFinding('finding-{{ finding.id }}')">
+          <span class="finding-severity">
+            {% if finding.severity == 'CRITICAL' %}
+              <span class="badge badge-sm badge-critical"><span class="badge-dot"></span>CRITICAL</span>
+            {% elif finding.severity == 'HIGH' %}
+              <span class="badge badge-sm badge-high"><span class="badge-dot"></span>HIGH</span>
+            {% elif finding.severity == 'MEDIUM' %}
+              <span class="badge badge-sm badge-medium"><span class="badge-dot"></span>MEDIUM</span>
+            {% endif %}
+          </span>
+          <span class="finding-rule">{{ finding.rule_name }}</span>
+          <span class="finding-location">
+            <span class="finding-location-path">{{ finding.file_path }}</span>
+            <span class="finding-location-line">{{ finding.line_number }}</span>
+          </span>
+          <span class="finding-expand-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </span>
+        </div>
+        <div class="finding-body">
+          <div class="finding-detail-grid">
+            <div class="finding-detail-item full-width">
+              <span class="finding-detail-label">Secret</span>
+              <div class="secret-display">
+                <span class="secret-text" id="secret-{{ finding.id }}">{{ finding.secret_preview }}</span>
+                <button class="secret-toggle" onclick="toggleSecret('secret-{{ finding.id }}', '{{ finding.secret_full }}')">Show</button>
+              </div>
+            </div>
+            <div class="finding-detail-item full-width">
+              <span class="finding-detail-label">Match Context</span>
+              <div class="match-context">
+                <div class="match-context-header">
+                  <span>{{ finding.file_path }}:{{ finding.line_number }}</span>
+                  <span>Line {{ finding.line_number }}</span>
+                </div>
+                <pre class="match-context-code">{{ finding.context_before }}<span class="line-highlight"><span class="line-num">{{ finding.line_number }}</span>{{ finding.matched_line }}</span>
+{{ finding.context_after }}</pre>
+              </div>
+            </div>
+            <div class="finding-detail-item">
+              <span class="finding-detail-label">Rule</span>
+              <span class="finding-detail-value">{{ finding.rule_name }}</span>
+            </div>
+            <div class="finding-detail-item">
+              <span class="finding-detail-label">Severity</span>
+              <span class="finding-detail-value">
+                {% if finding.severity == 'CRITICAL' %}
+                  <span class="badge badge-sm badge-critical">CRITICAL</span>
+                {% elif finding.severity == 'HIGH' %}
+                  <span class="badge badge-sm badge-high">HIGH</span>
+                {% elif finding.severity == 'MEDIUM' %}
+                  <span class="badge badge-sm badge-medium">MEDIUM</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="finding-detail-item">
+              <span class="finding-detail-label">File</span>
+              <span class="finding-detail-value" style="font-family:var(--font-mono);font-size:var(--text-xs);">{{ finding.file_path }}</span>
+            </div>
+            <div class="finding-detail-item">
+              <span class="finding-detail-label">Line</span>
+              <span class="finding-detail-value" style="font-family:var(--font-mono);">{{ finding.line_number }}</span>
+            </div>
+          </div>
+          <div class="finding-actions">
+            <button class="btn btn-sm btn-ghost" onclick="copyFinding('{{ finding.id }}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy Details
+            </button>
+            <a href="https://github.com/{{ scan.repo_name }}/blob/{{ scan.branch }}/{{ finding.file_path }}#L{{ finding.line_number }}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+              View on GitHub
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="pagination">
+      {% if scan.current_page > 1 %}
+        <a href="/scan/{{ scan.id }}?page={{ scan.current_page - 1 }}" class="page-btn page-btn-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </a>
+      {% else %}
+        <span class="page-btn page-btn-icon disabled">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </span>
+      {% endif %}
+
+      {% for p in range(1, scan.total_pages + 1) %}
+        {% if p == scan.current_page %}
+          <span class="page-btn active">{{ p }}</span>
+        {% elif p <= 3 or p >= scan.total_pages - 2 or (p >= scan.current_page - 1 and p <= scan.current_page + 1) %}
+          <a href="/scan/{{ scan.id }}?page={{ p }}" class="page-btn">{{ p }}</a>
+        {% elif p == 4 or p == scan.total_pages - 3 %}
+          <span class="page-ellipsis">…</span>
+        {% endif %}
+      {% endfor %}
+
+      {% if scan.current_page < scan.total_pages %}
+        <a href="/scan/{{ scan.id }}?page={{ scan.current_page + 1 }}" class="page-btn page-btn-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+      {% else %}
+        <span class="page-btn page-btn-icon disabled">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </span>
+      {% endif %}
+    </div>
+
+    {% else %}
+    <!-- Empty State: No Findings -->
+    <div class="empty-findings">
+      <div class="empty-checkmark">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="empty-findings-title">No secrets found in this scan</div>
+      <div class="empty-findings-text">Great news! This scan didn't detect any secrets or sensitive data exposed in the repository.</div>
+      <a href="/repo/{{ scan.repo_id }}" class="btn btn-secondary empty-state-action">Back to Repository</a>
+    </div>
+    {% endif %}
+
+  </main>
+</div>
+
+
+<!-- ═══ TOAST CONTAINER ═══ -->
+<div class="toast-container" id="toastContainer"></div>
+
+
+<script src="{{ url_for('static', path='/js/app.js') }}"></script>
+<script>
+  // ── Toggle finding expand/collapse ──
+  function toggleFinding(id) {
+    var card = document.getElementById(id);
+    if (card) {
+      card.classList.toggle('expanded');
+    }
+  }
+
+  // ── Toggle secret show/hide ──
+  function toggleSecret(id, fullSecret) {
+    var el = document.getElementById(id);
+    var btn = el.nextElementSibling;
+    if (el.classList.contains('revealed')) {
+      // Truncate: show first 20 chars + "…"
+      el.textContent = fullSecret.substring(0, 20) + '…';
+      el.classList.remove('revealed');
+      btn.textContent = 'Show';
+    } else {
+      el.textContent = fullSecret;
+      el.classList.add('revealed');
+      btn.textContent = 'Hide';
+    }
+  }
+
+  // ── Copy finding details ──
+  function copyFinding(findingId) {
+    var card = document.getElementById('finding-' + findingId);
+    if (!card) return;
+    var rule = card.querySelector('.finding-rule').textContent;
+    var location = card.querySelector('.finding-location').textContent;
+    var severity = card.querySelector('.badge').textContent.trim();
+    var text = 'Finding: ' + rule + '\nSeverity: ' + severity + '\nLocation: ' + location;
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('success', 'Copied', 'Finding details copied to clipboard.');
+    }).catch(function() {
+      showToast('error', 'Failed', 'Could not copy to clipboard.');
+    });
+  }
+
+  // ── Filter findings ──
+  function filterFindings() {
+    var search = document.getElementById('findingSearch').value.toLowerCase();
+    var severity = document.getElementById('severityFilter').value;
+    var cards = document.querySelectorAll('.finding-card');
+    var visible = 0;
+    cards.forEach(function(card) {
+      var sev = card.getAttribute('data-severity');
+      var rule = card.getAttribute('data-rule');
+      var file = card.getAttribute('data-file');
+      var matchSeverity = severity === 'all' || sev === severity;
+      var matchSearch = !search || rule.indexOf(search) !== -1 || file.indexOf(search) !== -1;
+      var show = matchSeverity && matchSearch;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    var countEl = document.getElementById('resultsCount');
+    if (countEl) {
+      countEl.innerHTML = 'Showing <strong>' + visible + '</strong> findings';
+    }
+  }
+
+  // ── Rescan ──
+  function rescanRepo(repoId) {
+    showToast('info', 'Scan Started', 'A new scan has been queued for this repository.');
+  }
+
+  // ── Export ──
+  function exportFindings(format, scanId) {
+    showToast('success', 'Export Started', 'Your ' + format.toUpperCase() + ' export is being prepared.');
+  }
+
+  // ── Toast helper ──
+  function showToast(type, title, message) {
+    var container = document.getElementById('toastContainer');
+    if (!container) return;
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+    var iconSvg = '';
+    if (type === 'success') {
+      iconSvg = '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+    } else if (type === 'error') {
+      iconSvg = '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+    } else {
+      iconSvg = '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+    }
+    toast.innerHTML = iconSvg +
+      '<div class="toast-content"><div class="toast-title">' + title + '</div><div class="toast-message">' + message + '</div></div>' +
+      '<button class="toast-close" onclick="this.parentElement.remove()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+      '<div class="toast-progress" style="animation-duration:4s;"></div>';
+    container.appendChild(toast);
+    setTimeout(function() {
+      toast.classList.add('removing');
+      setTimeout(function() { toast.remove(); }, 400);
+    }, 4000);
+  }
+
+  // ── Dropdown toggle ──
+  function toggleDropdown(id) {
+    var dd = document.getElementById(id);
+    if (!dd) return;
+    var isOpen = dd.classList.contains('open');
+    // Close all
+    document.querySelectorAll('.dropdown.open').forEach(function(el) { el.classList.remove('open'); });
+    if (!isOpen) dd.classList.add('open');
+  }
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown')) {
+      document.querySelectorAll('.dropdown.open').forEach(function(el) { el.classList.remove('open'); });
+    }
+  });
+
+  // ── Sidebar toggle ──
+  function toggleSidebar() {
+    var sb = document.getElementById('sidebar');
+    if (sb) sb.classList.toggle('collapsed');
+  }
+
+  // ── Mobile menu toggle ──
+  function toggleMobileMenu() {
+    var overlay = document.getElementById('mobileOverlay');
+    var menu = document.getElementById('mobileMenu');
+    var hamburger = document.getElementById('navHamburger');
+    if (overlay) overlay.classList.toggle('open');
+    if (menu) menu.classList.toggle('open');
+    if (hamburger) hamburger.classList.toggle('active');
+  }
+
+  // ── Nav scroll shadow ──
+  window.addEventListener('scroll', function() {
+    var nav = document.getElementById('topNav');
+    if (nav) nav.classList.toggle('scrolled', window.scrollY > 10);
+  });
+</script>
+</body>
+</html>

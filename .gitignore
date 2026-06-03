@@ -46,4 +46,4 @@ terraform.tfstate*
 .env.vault
 secrets/
 private/
-.hermes/
+.hermes/data/
