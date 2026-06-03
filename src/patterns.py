@@ -183,4 +183,4 @@ class SecretMatcher:
             if re.search(pattern, path, re.IGNORECASE):
                 matches.append(pattern)
         
-        return matches
+        return matcheswait 

@@ -515,7 +515,7 @@ async def dashboard(request: Request):
 </div>
 
 <script>
-var isAuthenticated = {str(bool(session)).toLowerCase()};
+var isAuthenticated = {"true" if session else "false"};
 
 function showMsg(msg, type) {{
   var el = document.getElementById('message');

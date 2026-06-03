@@ -13,17 +13,17 @@ ALLOWED_GIT_HOSTS: set = set()  # e.g. {"github.com", "gitlab.com"}
 
 # Blocked path patterns for local scan (prevent reading sensitive system files)
 BLOCKED_PATH_PATTERNS = [
-    r"^/etc/",
-    r"^/private/etc/",
-    r"^/root/",
-    r"^/var/log/",
-    r"^/proc/",
-    r"^/sys/",
+    r"^/etc(?:/|$)",
+    r"^/private/etc(?:/|$)",
+    r"^/root(?:/|$)",
+    r"^/var/log(?:/|$)",
+    r"^/proc(?:/|$)",
+    r"^/sys(?:/|$)",
     r"/\.ssh(?:/|$)",
     r"/\.gnupg(?:/|$)",
     r"/\.aws/credentials$",
-    r"/\.env(?:$|\\.)",
-    r"/\\.npmrc$",
+    r"/\.env(?:\.|$)",
+    r"/\.npmrc$",
     r"/\.docker(?:/|$)",
     r"/\.kube(?:/|$)",
 ]
