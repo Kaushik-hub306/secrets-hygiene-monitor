@@ -3,489 +3,151 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — Secrets Hygiene Monitor</title>
+<title>Secrets Hygiene Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}">
-<style>
-  /* ── Dashboard-specific layout ── */
-  .dashboard-layout { display: flex; min-height: 100vh; }
-  .dashboard-main { flex: 1; margin-left: 260px; padding: 2rem; transition: margin-left var(--transition-normal); }
-  .dashboard-main.expanded { margin-left: 72px; }
-
-  /* ── Stats cards ── */
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
-  .stat-card { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: 12px; padding: 1.5rem; position: relative; overflow: hidden; transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
-  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
-  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent-emerald), var(--accent-teal)); opacity: 0; transition: opacity var(--transition-fast); }
-  .stat-card:hover::before { opacity: 1; }
-  .stat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; margin-bottom: 1rem; }
-  .stat-icon.folder { background: rgba(59,130,246,0.12); color: var(--accent-blue); }
-  .stat-icon.scan { background: rgba(16,185,129,0.12); color: var(--accent-emerald); }
-  .stat-icon.warning { background: rgba(249,115,22,0.12); color: var(--sev-high); }
-  .stat-icon.alert { background: rgba(239,68,68,0.12); color: var(--sev-critical); }
-  .stat-number { font-size: 2rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; }
-  .stat-label { font-size: 0.8rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
-  .stat-trend { font-size: 0.75rem; margin-top: 0.5rem; display: inline-flex; align-items: center; gap: 0.25rem; }
-  .stat-trend.up { color: var(--accent-emerald); }
-  .stat-trend.down { color: var(--sev-critical); }
-
-  /* ── Two-column content ── */
-  .content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
-
-  /* ── Severity bar chart ── */
-  .severity-chart { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: 12px; padding: 1.5rem; }
-  .chart-title { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary); }
-  .stacked-bar { display: flex; height: 24px; border-radius: 12px; overflow: hidden; margin-bottom: 0.75rem; }
-  .stacked-bar .seg { transition: width 0.8s ease; }
-  .stacked-bar .seg.critical { background: var(--sev-critical); }
-  .stacked-bar .seg.high { background: var(--sev-high); }
-  .stacked-bar .seg.medium { background: var(--sev-medium, #eab308); }
-  .chart-legend { display: flex; gap: 1.5rem; flex-wrap: wrap; }
-  .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); }
-  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
-
-  /* ── Repos table ── */
-  .repos-card { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; }
-  .repos-card-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-default); }
-  .repos-card-header h2 { font-size: 1.1rem; font-weight: 600; margin: 0; }
-  .repos-table { width: 100%; border-collapse: collapse; }
-  .repos-table th { text-align: left; padding: 0.75rem 1.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); background: var(--bg-elevated); border-bottom: 1px solid var(--border-default); font-weight: 600; }
-  .repos-table td { padding: 1rem 1.5rem; border-bottom: 1px solid var(--divider); font-size: 0.9rem; vertical-align: middle; }
-  .repos-table tr:last-child td { border-bottom: none; }
-  .repos-table tr:hover td { background: rgba(255,255,255,0.02); }
-  .repo-name-cell { display: flex; align-items: center; gap: 0.75rem; }
-  .repo-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .repo-status-dot.active { background: var(--accent-emerald); box-shadow: 0 0 8px rgba(16,185,129,0.4); }
-  .repo-name-text { font-weight: 600; color: var(--text-primary); }
-  .repo-url-text { font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.15rem; }
-  .findings-pills { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-  .finding-pill { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.2rem 0.5rem; border-radius: 99px; font-size: 0.7rem; font-weight: 600; }
-  .finding-pill.critical { background: var(--sev-critical-bg); color: var(--sev-critical); }
-  .finding-pill.high { background: var(--sev-high-bg); color: var(--sev-high); }
-  .finding-pill.medium { background: rgba(234,179,8,0.12); color: #eab308; }
-  .repo-actions { display: flex; gap: 0.5rem; }
-
-  /* ── Activity feed ── */
-  .activity-card { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: 12px; padding: 1.5rem; }
-  .activity-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
-  .activity-item { display: flex; gap: 0.75rem; padding: 0.75rem 0; border-bottom: 1px solid var(--divider); }
-  .activity-item:last-child { border-bottom: none; }
-  .activity-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 0.35rem; }
-  .activity-dot.scan { background: var(--accent-blue); }
-  .activity-dot.alert { background: var(--sev-high); }
-  .activity-dot.clean { background: var(--accent-emerald); }
-  .activity-info { flex: 1; }
-  .activity-title { font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.2rem; }
-  .activity-meta { font-size: 0.75rem; color: var(--text-tertiary); }
-
-  /* ── Add repo form ── */
-  .add-repo-card { background: var(--bg-surface); border: 1px dashed var(--border-hover); border-radius: 12px; padding: 2rem; text-align: center; transition: border-color var(--transition-fast); margin-bottom: 2rem; }
-  .add-repo-card:hover { border-color: var(--accent-emerald); }
-  .add-repo-card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
-  .add-repo-card p { color: var(--text-tertiary); font-size: 0.85rem; margin-bottom: 1.25rem; }
-  .add-repo-form { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
-  .add-repo-form input { background: var(--bg-input); border: 1px solid var(--border-default); color: var(--text-primary); padding: 0.65rem 1rem; border-radius: 8px; font-size: 0.9rem; min-width: 280px; }
-  .add-repo-form input:focus { outline: none; border-color: var(--accent-emerald); }
-
-  /* ── Welcome header ── */
-  .welcome-header { margin-bottom: 2rem; }
-  .welcome-header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.25rem; }
-  .welcome-header p { color: var(--text-tertiary); font-size: 0.9rem; }
-
-  @media (max-width: 1024px) {
-    .content-grid { grid-template-columns: 1fr; }
-    .dashboard-main { margin-left: 0; }
-  }
-  @media (max-width: 768px) {
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .repos-table { display: block; overflow-x: auto; }
-  }
-</style>
 </head>
 <body>
-<!-- Top Navigation -->
-<nav class="top-nav">
-  <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <span class="nav-logo-icon">🛡️</span>
-      <span class="nav-logo-text">Secrets Monitor</span>
+<div class="page dash-page active">
+  <header class="topbar">
+    <a class="logo-row" href="/">
+      <div class="logo-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
+      <span class="logo-text">secrets-hygiene-monitor</span>
     </a>
-    <div class="nav-search">
-      <input type="text" id="search-input" placeholder="Search repos, scans..." />
-      <span class="nav-search-shortcut">/</span>
-    </div>
-    <div class="nav-actions">
-      <button class="nav-icon-btn" title="Notifications">
-        🔔
-        <span class="nav-badge">3</span>
+    <div class="topbar-right">
+      <span id="last-scan-time" class="last-scan-time">last scan: never</span>
+      <button class="scan-btn" id="run-scan-btn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+        Run scan
       </button>
-      <div class="nav-user">
-        <button class="nav-avatar" id="user-menu-btn">KU</button>
-        <div class="nav-dropdown" id="user-dropdown">
-          <div class="nav-dropdown-header">
-            <strong id="user-name">User</strong>
-            <span id="user-login">@user</span>
-          </div>
-          <div class="nav-dropdown-divider"></div>
-          <a href="/settings" class="nav-dropdown-item">⚙️ Settings</a>
-          <a href="/auth/logout" class="nav-dropdown-item">🚪 Logout</a>
-        </div>
-      </div>
-      <button class="nav-hamburger" id="sidebar-toggle">☰</button>
+      <a class="avatar" id="avatar" href="/auth/logout" title="Logout">K</a>
     </div>
+  </header>
+
+  <div class="dash-body">
+    <aside class="sidebar">
+      <div class="nav-label">Monitor</div>
+      <button class="nav-item active" type="button" data-panel="overview">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        Overview
+      </button>
+      <button class="nav-item" type="button" data-panel="repos">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+        Repositories
+        <span class="nav-badge" id="repo-nav-count">0</span>
+      </button>
+      <button class="nav-item" type="button" data-panel="coverage">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        Coverage
+      </button>
+      <button class="nav-item" type="button" data-panel="alerts">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        Audit Log
+      </button>
+      <div class="nav-label">Alerts</div>
+      <button class="nav-item" type="button" data-panel="alerts">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        Findings
+        <span class="nav-badge" id="alert-nav-count">0</span>
+      </button>
+      <button class="nav-item" type="button" id="show-add-repo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+        Add Repo
+      </button>
+    </aside>
+
+    <main class="main">
+      <section id="add-repo-panel" class="add-repo-panel" hidden>
+        <div class="section-title">add repository</div>
+        <div class="add-repo-form">
+          <input type="text" id="repo-url-input" placeholder="https://github.com/user/repo">
+          <input type="text" id="repo-branch-input" placeholder="main" value="main">
+          <button class="connect-btn compact" id="add-repo-btn" type="button">Add</button>
+          <button class="discord-btn compact" id="load-github-repos-btn" type="button">Load my GitHub repos</button>
+        </div>
+        <div class="github-picker" id="github-picker" hidden>
+          <input type="text" id="github-search" placeholder="Filter repos">
+          <div id="github-repos-items" class="github-repos-items"></div>
+        </div>
+      </section>
+
+      <section data-section="overview">
+        <div class="section-title">status overview</div>
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-label">repos scanned</div>
+            <div class="metric-val blue" id="metric-repos">0</div>
+            <div class="metric-sub" id="metric-repos-sub">0 monitored</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">secrets found</div>
+            <div class="metric-val red" id="metric-findings">0</div>
+            <div class="metric-sub" id="metric-findings-sub">0 critical</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">high severity</div>
+            <div class="metric-val amber" id="metric-high">0</div>
+            <div class="metric-sub">needs review</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">repos clean</div>
+            <div class="metric-val green" id="metric-clean">0</div>
+            <div class="metric-sub" id="metric-clean-sub">0% healthy</div>
+          </div>
+        </div>
+      </section>
+
+      <section data-section="repos">
+        <div class="section-title">github repositories</div>
+        <div class="repos" id="repo-list"></div>
+      </section>
+
+      <section data-section="alerts">
+        <div class="section-title">recent alerts</div>
+        <div class="alerts" id="alert-list"></div>
+      </section>
+    </main>
+
+    <aside class="right-panel">
+      <section data-section="coverage">
+        <div class="panel-title">scan coverage</div>
+        <div id="coverage-list"></div>
+      </section>
+
+      <section>
+        <div class="panel-title">detected secret types</div>
+        <div class="detected-list" id="detected-list"></div>
+      </section>
+
+      <section>
+        <div class="panel-title">integrations</div>
+        <div class="integration-list">
+          <div class="integration-item"><span class="dot green"></span><span>GitHub OAuth</span><span id="github-status">active</span></div>
+          <div class="integration-item"><span class="dot amber"></span><span>Discord</span><span>per repo</span></div>
+          <div class="integration-item"><span class="dot amber"></span><span>Slack</span><span>per repo</span></div>
+          <div class="integration-item"><span class="dot green"></span><span>Gitleaks</span><span>local</span></div>
+        </div>
+      </section>
+    </aside>
   </div>
-</nav>
-
-<div class="dashboard-layout">
-  <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <nav class="sidebar-nav">
-      <span class="sidebar-label">Main</span>
-      <a href="/" class="sidebar-item active">
-        <span class="sidebar-icon">📊</span>
-        <span class="sidebar-text">Dashboard</span>
-      </a>
-      <a href="#repos" class="sidebar-item">
-        <span class="sidebar-icon">📁</span>
-        <span class="sidebar-text">Repositories</span>
-        <span class="sidebar-badge" id="repo-count-badge">0</span>
-      </a>
-      <a href="#activity" class="sidebar-item">
-        <span class="sidebar-icon">🕐</span>
-        <span class="sidebar-text">Scan History</span>
-      </a>
-      <a href="#alerts" class="sidebar-item">
-        <span class="sidebar-icon">🔔</span>
-        <span class="sidebar-text">Alerts</span>
-      </a>
-      <span class="sidebar-label">Configuration</span>
-      <a href="/settings" class="sidebar-item">
-        <span class="sidebar-icon">⚙️</span>
-        <span class="sidebar-text">Settings</span>
-      </a>
-    </nav>
-    <div class="sidebar-footer">
-      <a href="/docs" class="sidebar-item">
-        <span class="sidebar-icon">📖</span>
-        <span class="sidebar-text">Documentation</span>
-      </a>
-    </div>
-  </aside>
-
-  <!-- Main Content -->
-  <main class="dashboard-main" id="main-content">
-    <!-- Welcome -->
-    <div class="welcome-header">
-      <h1>Welcome back, <span id="welcome-name">User</span> 👋</h1>
-      <p id="current-date">Loading...</p>
-    </div>
-
-    <!-- Stats -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon folder">📁</div>
-        <div class="stat-number" id="stat-repos">0</div>
-        <div class="stat-label">Total Repos</div>
-        <div class="stat-trend up" id="stat-repos-trend">↑ 0 this week</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon scan">🔍</div>
-        <div class="stat-number" id="stat-scans">0</div>
-        <div class="stat-label">Total Scans</div>
-        <div class="stat-trend up" id="stat-scans-trend">↑ 0 today</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon warning">⚠️</div>
-        <div class="stat-number" id="stat-findings">0</div>
-        <div class="stat-label">Secrets Found</div>
-        <div class="stat-trend down" id="stat-findings-trend">↓ 0 from last week</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon alert">🚨</div>
-        <div class="stat-number" id="stat-critical">0</div>
-        <div class="stat-label">Critical Issues</div>
-        <div class="stat-trend" id="stat-critical-trend">Needs attention</div>
-      </div>
-    </div>
-
-    <div class="content-grid">
-      <!-- Repositories Table -->
-      <div class="repos-card" id="repos">
-        <div class="repos-card-header">
-          <h2>📁 Monitored Repositories</h2>
-          <button class="btn btn-sm btn-primary" onclick="document.getElementById('add-repo-card').style.display='block'">+ Add Repo</button>
-        </div>
-        <table class="repos-table" id="repos-table">
-          <thead>
-            <tr>
-              <th>Repository</th>
-              <th>Last Scan</th>
-              <th>Findings</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="repos-tbody">
-            <tr>
-              <td colspan="4" style="text-align:center;padding:3rem;color:var(--text-tertiary);">
-                No repositories yet. Add one below to get started.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Sidebar right -->
-      <div>
-        <!-- Severity Chart -->
-        <div class="severity-chart" style="margin-bottom:1.5rem;">
-          <div class="chart-title">Severity Breakdown</div>
-          <div class="stacked-bar" id="severity-bar">
-            <div class="seg critical" style="width:0%"></div>
-            <div class="seg high" style="width:0%"></div>
-            <div class="seg medium" style="width:100%"></div>
-          </div>
-          <div class="chart-legend">
-            <div class="legend-item"><span class="legend-dot" style="background:var(--sev-critical)"></span>Critical: <span id="legend-critical">0</span></div>
-            <div class="legend-item"><span class="legend-dot" style="background:var(--sev-high)"></span>High: <span id="legend-high">0</span></div>
-            <div class="legend-item"><span class="legend-dot" style="background:#eab308"></span>Medium: <span id="legend-medium">0</span></div>
-          </div>
-        </div>
-
-        <!-- Recent Activity -->
-        <div class="activity-card" id="activity">
-          <h3>🕐 Recent Activity</h3>
-          <div id="activity-feed">
-            <div class="activity-item">
-              <div class="activity-dot scan"></div>
-              <div class="activity-info">
-                <div class="activity-title">No recent activity</div>
-                <div class="activity-meta">Add a repo and run a scan to get started</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add Repo Card -->
-    <div class="add-repo-card" id="add-repo-card" style="display:none;">
-      <h3>Add a Repository to Monitor</h3>
-      <p>Paste a GitHub repo URL or load repos from your account</p>
-      <div class="add-repo-form">
-        <input type="text" id="repo-url-input" placeholder="https://github.com/user/repo" />
-        <input type="text" id="repo-branch-input" placeholder="main" style="width:100px;min-width:100px;" />
-        <button class="btn btn-primary" onclick="addRepoFromUrl()">Add</button>
-      </div>
-      <button class="btn btn-secondary" style="margin-top:0.75rem;" onclick="loadGitHubRepos()">📂 Load my GitHub repos</button>
-
-      <!-- GitHub repos modal list -->
-      <div id="github-repos-list" style="margin-top:1.5rem;text-align:left;display:none;">
-        <input type="text" id="github-search" placeholder="Filter repos..." style="width:100%;margin-bottom:0.75rem;" oninput="filterGitHubRepos()" />
-        <div id="github-repos-items" style="max-height:300px;overflow-y:auto;"></div>
-      </div>
-    </div>
-  </main>
 </div>
 
-<!-- Modal Overlay -->
-<div class="modal-overlay" id="modal-overlay" style="display:none;">
-  <div class="modal" id="modal-content"></div>
+<div class="scan-overlay" id="scan-overlay">
+  <div class="scan-overlay-title">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+    <span id="scan-status">Scanning...</span>
+  </div>
+  <div class="scan-log" id="scan-log"></div>
+  <div class="scan-progress-bar">
+    <div class="scan-progress-fill" id="scan-progress"></div>
+  </div>
 </div>
 
-<!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
-
 <script src="{{ url_for('static', path='/js/app.js') }}"></script>
-<script>
-// ── Dashboard Logic ──
-let allRepos = [];
-let allScans = [];
-let gitHubRepos = [];
-
-async function loadDashboard() {
-  try {
-    const resp = await fetch('/auth/me');
-    const auth = await resp.json();
-    if (!auth.authenticated) { window.location.href = '/'; return; }
-    document.getElementById('welcome-name').textContent = auth.login;
-    document.getElementById('user-name').textContent = auth.login;
-    document.getElementById('user-login').textContent = '@' + auth.login;
-    document.getElementById('user-menu-btn').textContent = auth.login.slice(0,2).toUpperCase();
-  } catch(e) {}
-
-  // Date
-  const d = new Date();
-  document.getElementById('current-date').textContent = d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-
-  try {
-    const resp = await fetch('/api/repos');
-    allRepos = (await resp.json()).repos || [];
-    renderRepos();
-    updateStats();
-  } catch(e) { console.error('Failed to load repos:', e); }
-
-  try {
-    const resp = await fetch('/api/dashboard');
-    const data = await resp.json();
-    allScans = data.scans || [];
-    renderActivity();
-    updateSeverityChart();
-  } catch(e) { console.error('Failed to load dashboard:', e); }
-}
-
-function renderRepos() {
-  const tbody = document.getElementById('repos-tbody');
-  document.getElementById('repo-count-badge').textContent = allRepos.length;
-  if (!allRepos.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:3rem;color:var(--text-tertiary);">No repositories yet. Add one above to get started.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = allRepos.map(r => {
-    const ls = r.last_scan;
-    const findings = ls ? `<div class="findings-pills">${ls.critical ? `<span class="finding-pill critical">${ls.critical} crit</span>` : ''}${ls.high ? `<span class="finding-pill high">${ls.high} high</span>` : ''}${ls.total_findings ? `<span class="finding-pill medium">${ls.total_findings} total</span>` : ''}</div>` : '<span style="color:var(--text-tertiary);font-size:0.8rem;">Not scanned</span>';
-    const lastScan = ls ? timeAgo(ls.created_at) : 'Never';
-    return `<tr>
-      <td><div class="repo-name-cell"><span class="repo-status-dot active"></span><div><div class="repo-name-text">${r.name}</div><div class="repo-url-text">${r.url}</div></div></div></td>
-      <td style="color:var(--text-secondary);font-size:0.85rem;">${lastScan}</td>
-      <td>${findings}</td>
-      <td><div class="repo-actions">
-        <button class="btn btn-sm btn-primary" onclick="scanRepo('${r.id}','${r.name}')">Scan</button>
-        <a href="/repo/${r.id}" class="btn btn-sm btn-secondary">Details</a>
-        <button class="btn btn-sm btn-danger" onclick="removeRepo('${r.id}','${r.name}')">✕</button>
-      </div></td>
-    </tr>`;
-  }).join('');
-}
-
-function updateStats() {
-  document.getElementById('stat-repos').textContent = allRepos.length;
-  const totalScans = allScans.length;
-  const totalFindings = allScans.reduce((s, sc) => s + (sc.total_findings || 0), 0);
-  const totalCritical = allScans.reduce((s, sc) => s + (sc.critical || 0), 0);
-  document.getElementById('stat-scans').textContent = totalScans;
-  document.getElementById('stat-findings').textContent = totalFindings;
-  document.getElementById('stat-critical').textContent = totalCritical;
-}
-
-function updateSeverityChart() {
-  const c = allScans.reduce((s, sc) => s + (sc.critical || 0), 0);
-  const h = allScans.reduce((s, sc) => s + (sc.high || 0), 0);
-  const m = allScans.reduce((s, sc) => s + (sc.medium || 0), 0);
-  const total = c + h + m || 1;
-  document.getElementById('legend-critical').textContent = c;
-  document.getElementById('legend-high').textContent = h;
-  document.getElementById('legend-medium').textContent = m;
-  const bar = document.getElementById('severity-bar');
-  bar.querySelector('.seg.critical').style.width = (c / total * 100) + '%';
-  bar.querySelector('.seg.high').style.width = (h / total * 100) + '%';
-  bar.querySelector('.seg.medium').style.width = (m / total * 100) + '%';
-}
-
-function renderActivity() {
-  const feed = document.getElementById('activity-feed');
-  if (!allScans.length) return;
-  feed.innerHTML = allScans.slice(0, 10).map(s => {
-    const dotClass = s.critical > 0 ? 'alert' : (s.total_findings > 0 ? 'scan' : 'clean');
-    return `<div class="activity-item">
-      <div class="activity-dot ${dotClass}"></div>
-      <div class="activity-info">
-        <div class="activity-title">${s.repo_name}: ${s.total_findings} findings</div>
-        <div class="activity-meta">${s.triggered_by} · ${timeAgo(s.created_at)}</div>
-      </div>
-      <a href="/scan/${s.id}" style="color:var(--text-link);font-size:0.75rem;align-self:center;">View</a>
-    </div>`;
-  }).join('');
-}
-
-async function addRepoFromUrl() {
-  const url = document.getElementById('repo-url-input').value.trim();
-  const branch = document.getElementById('repo-branch-input').value.trim() || 'main';
-  if (!url) { toast.show('Enter a repo URL', 'error'); return; }
-  try {
-    const resp = await fetch('/api/repos', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url, branch}) });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.detail || 'Failed');
-    toast.show(data.message, 'success');
-    document.getElementById('repo-url-input').value = '';
-    loadDashboard();
-  } catch(e) { toast.show(e.message, 'error'); }
-}
-
-async function loadGitHubRepos() {
-  try {
-    const resp = await fetch('/api/github/repos');
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.detail || 'Failed');
-    gitHubRepos = data.repos || [];
-    document.getElementById('github-repos-list').style.display = 'block';
-    renderGitHubRepos(gitHubRepos);
-  } catch(e) { toast.show(e.message, 'error'); }
-}
-
-function renderGitHubRepos(repos) {
-  const el = document.getElementById('github-repos-items');
-  el.innerHTML = repos.slice(0, 30).map(r =>
-    `<div class="repo-name-cell" style="padding:0.5rem;border-bottom:1px solid var(--divider);">
-      <div style="flex:1;"><strong>${r.name}</strong><div style="font-size:0.7rem;color:var(--text-tertiary);">${r.private ? '🔒 Private' : '🌐 Public'} · ${r.default_branch}</div></div>
-      <button class="btn btn-sm btn-primary" onclick="addGitHubRepo('${r.url}','${r.name}',${r.id},'${r.default_branch}')">Add</button>
-    </div>`
-  ).join('');
-}
-
-function filterGitHubRepos() {
-  const q = document.getElementById('github-search').value.toLowerCase();
-  renderGitHubRepos(gitHubRepos.filter(r => r.name.toLowerCase().includes(q)));
-}
-
-async function addGitHubRepo(url, name, githubId, branch) {
-  try {
-    const resp = await fetch('/api/repos', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url, name, branch, github_repo_id: githubId}) });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.detail || 'Failed');
-    toast.show(data.message, 'success');
-    loadDashboard();
-  } catch(e) { toast.show(e.message, 'error'); }
-}
-
-async function scanRepo(id, name) {
-  toast.show(`Scanning ${name}...`, 'info');
-  try {
-    const resp = await fetch(`/api/repos/${id}/scan`, { method:'POST' });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.detail || 'Scan failed');
-    toast.show(`Scan complete: ${data.total_findings || 0} findings`, data.total_findings > 0 ? 'warning' : 'success');
-    setTimeout(loadDashboard, 2000);
-  } catch(e) { toast.show(e.message, 'error'); }
-}
-
-async function removeRepo(id, name) {
-  if (!confirm(`Remove "${name}" from monitoring?`)) return;
-  try {
-    const resp = await fetch(`/api/repos/${id}`, { method:'DELETE' });
-    if (!resp.ok) throw new Error('Failed');
-    toast.show(`${name} removed`, 'success');
-    loadDashboard();
-  } catch(e) { toast.show(e.message, 'error'); }
-}
-
-function timeAgo(iso) {
-  if (!iso) return 'Never';
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return 'Just now';
-  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-  return Math.floor(diff / 86400) + 'd ago';
-}
-
-// User dropdown toggle
-document.getElementById('user-menu-btn').addEventListener('click', function() {
-  document.getElementById('user-dropdown').classList.toggle('open');
-});
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.nav-user')) document.getElementById('user-dropdown').classList.remove('open');
-});
-
-// Init
-loadDashboard();
-</script>
 </body>
 </html>

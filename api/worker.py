@@ -72,7 +72,7 @@ async def scan_repo_and_store(repo_id: str, user_id: str, repo_url: str, branch:
         ).fetchall()
         conn.close()
         if len(rows) > 1:
-            prev_findings = json.loads(rows[1].get("findings_json", "[]"))
+            prev_findings = json.loads(rows[1]["findings_json"] or "[]")
 
     new_findings = _diff_findings(findings, prev_findings)
 

@@ -86,11 +86,12 @@ check("PASS", "New-finding detection (diff works)")
 # 7. FastAPI routes
 routes = [r.path for r in app.routes if hasattr(r, "path")]
 expected = [
-    "/api/health", "/api/dashboard", "/api/repos", "/api/scan",
+    "/api/health", "/api/dashboard", "/api/repos",
     "/auth/github", "/auth/github/callback", "/webhooks/github",
+    "/api/repos/{repo_id}/scan",
 ]
 for ep in expected:
-    found = any(ep in r for r in routes)
+    found = any(ep == r for r in routes)
     check("PASS" if found else "FAIL", f"Route {ep}")
 
 # Summary

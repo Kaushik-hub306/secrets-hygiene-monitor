@@ -38,8 +38,11 @@ def scan_directory(path: str) -> List[Dict]:
         "detect",
         "--source", path,
         "--report-format", "json",
+        "--report-path", "-",
+        "--redact",
+        "--no-banner",
+        "--no-color",
         "--no-git",        # Scan files directly, don't require git history
-        "--verbose",
     ]
 
     logger.info(f"Running gitleaks on {path}")
@@ -55,8 +58,7 @@ def scan_directory(path: str) -> List[Dict]:
             findings = json.loads(result.stdout)
             return _normalize_findings(findings, path)
         except json.JSONDecodeError:
-            # Sometimes output goes to stderr
-            logger.error(f"gitleaks parse error. stdout: {result.stdout[:500]}, stderr: {result.stderr[:500]}")
+            logger.error("gitleaks parse error while reading JSON report")
             return []
 
     logger.error(f"gitleaks error (exit {result.returncode}): {result.stderr[:500]}")

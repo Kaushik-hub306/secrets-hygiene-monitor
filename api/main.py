@@ -356,6 +356,8 @@ async def list_monitored_repos(request: Request):
             repo_data["last_scan"] = {
                 "total_findings": latest["total_findings"],
                 "critical": latest["critical"],
+                "high": latest["high"],
+                "medium": latest["medium"],
                 "created_at": latest["created_at"],
             }
         result.append(repo_data)
@@ -420,6 +422,7 @@ async def get_repo_scans(repo_id: str, request: Request):
 
 
 # ========== PAGE ROUTES ==========
+
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
