@@ -683,7 +683,7 @@
 
 <!-- ═══ TOP NAVIGATION ═══ -->
 <nav class="nav" id="topNav">
-  <a href="/dashboard" class="nav-logo">
+  <a href="/" class="nav-logo">
     <span class="nav-logo-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     </span>
@@ -691,10 +691,10 @@
   </a>
 
   <div class="nav-links">
-    <a href="/dashboard" class="nav-link">Dashboard</a>
-    <a href="/repos" class="nav-link">Repositories</a>
-    <a href="/scan-history" class="nav-link">Scan History</a>
-    <a href="/rules" class="nav-link">Rules</a>
+    <a href="/" class="nav-link">Dashboard</a>
+    <a href="/" class="nav-link">Repositories</a>
+    <a href="/" class="nav-link">Scan History</a>
+    <a href="/" class="nav-link">Rules</a>
     <a href="/settings" class="nav-link active">Settings</a>
   </div>
 
@@ -747,7 +747,7 @@
           <div style="font-size:var(--text-xs);color:var(--text-tertiary);">kaushik@example.com</div>
         </div>
         <div class="dropdown-divider"></div>
-        <a href="/profile" class="dropdown-item">
+        <a href="/" class="dropdown-item">
           <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           Profile
         </a>
@@ -756,7 +756,7 @@
           Settings
         </a>
         <div class="dropdown-divider"></div>
-        <a href="/logout" class="dropdown-item danger">
+        <a href="/auth/logout" class="dropdown-item danger">
           <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Sign out
         </a>
@@ -773,10 +773,10 @@
 <!-- Mobile overlay + menu -->
 <div class="mobile-menu-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
 <div class="mobile-menu" id="mobileMenu">
-  <a href="/dashboard" class="nav-link">Dashboard</a>
-  <a href="/repos" class="nav-link">Repositories</a>
-  <a href="/scan-history" class="nav-link">Scan History</a>
-  <a href="/rules" class="nav-link">Rules</a>
+  <a href="/" class="nav-link">Dashboard</a>
+  <a href="/" class="nav-link">Repositories</a>
+  <a href="/" class="nav-link">Scan History</a>
+  <a href="/" class="nav-link">Rules</a>
   <a href="/settings" class="nav-link active">Settings</a>
 </div>
 
@@ -790,27 +790,27 @@
   </div>
   <nav class="sidebar-nav">
     <div class="sidebar-group-label">Main</div>
-    <a href="/dashboard" class="sidebar-item" data-label="Dashboard">
+    <a href="/" class="sidebar-item" data-label="Dashboard">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       <span>Dashboard</span>
     </a>
-    <a href="/repos" class="sidebar-item" data-label="Repositories">
+    <a href="/" class="sidebar-item" data-label="Repositories">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
       <span>Repositories</span>
       <span class="sidebar-badge">12</span>
     </a>
-    <a href="/scan-history" class="sidebar-item" data-label="Scan History">
+    <a href="/" class="sidebar-item" data-label="Scan History">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
       <span>Scan History</span>
     </a>
 
     <div class="sidebar-group-label">Configuration</div>
-    <a href="/rules" class="sidebar-item" data-label="Rules">
+    <a href="/" class="sidebar-item" data-label="Rules">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       <span>Rules</span>
       <span class="sidebar-badge">24</span>
     </a>
-    <a href="/integrations" class="sidebar-item" data-label="Integrations">
+    <a href="/" class="sidebar-item" data-label="Integrations">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
       <span>Integrations</span>
     </a>
@@ -820,7 +820,7 @@
     </a>
   </nav>
   <div class="sidebar-footer">
-    <a href="/docs" class="sidebar-item" data-label="Documentation">
+    <a href="/" class="sidebar-item" data-label="Documentation">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
       <span>Docs</span>
     </a>
@@ -1072,7 +1072,7 @@
             </div>
             <div class="settings-empty-title">No repositories monitored</div>
             <div class="settings-empty-text">Connect a GitHub repository to start scanning for secrets and hygiene issues.</div>
-            <a href="/repos" class="btn btn-primary" style="margin-top: var(--sp-4);">Add Repository</a>
+            <a href="/" class="btn btn-primary" style="margin-top: var(--sp-4);">Add Repository</a>
           </div>
           -->
 
@@ -1335,4 +1335,18 @@ curl -X GET <span class="string">"https://api.secretsmonitor.io/v1/scans/42/find
                   <div class="account-provider">Connected via GitHub · @kaushik</div>
                 </div>
                 <button class="btn btn-sm btn-secondary" onclick="reconnectGitHub()">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                  Reconnect
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- end settings-layout -->
+      </div><!-- end main-content -->
+    </div><!-- end layout -->
+  </div><!-- end app -->
+
+<script src="{{ url_for('static', path='/js/app.js') }}"></script>
+</body>
+</html>

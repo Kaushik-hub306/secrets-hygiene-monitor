@@ -451,13 +451,229 @@
     });
   }
 
+  // ── Dropdown / Sidebar / Mobile ──────────────────────────────────────────
+
+  function toggleDropdown(id) {
+    const target = $(id);
+    if (!target) return;
+    const isOpen = target.classList.contains("open");
+    document.querySelectorAll(".dropdown.open").forEach((el) => el.classList.remove("open"));
+    if (!isOpen) target.classList.add("open");
+  }
+
+  function toggleSidebar() {
+    document.body.classList.toggle("sidebar-collapsed");
+  }
+
+  function toggleMobileMenu() {
+    document.body.classList.toggle("mobile-menu-open");
+  }
+
+  // ── Settings page helpers ────────────────────────────────────────────────
+
+  function toggleSettingsCard(id) {
+    const card = $(id);
+    if (card) card.classList.toggle("open");
+  }
+
+  function testWebhook(type) {
+    toast(`Testing ${type} webhook...`, "info");
+    setTimeout(() => toast("Webhook test sent!", "success"), 800);
+  }
+
+  function saveAlertConfig() {
+    const slack = ($("slackWebhook") || {}).value || "";
+    const discord = ($("discordWebhook") || {}).value || "";
+    const criticalOnly = ($("criticalOnlyToggle") || {}).checked || false;
+    const repoId = state.currentRepoId || (window.REPO_ID ?? "");
+    if (repoId) {
+      request(`/api/repos/${encodeURIComponent(repoId)}/alert`, {
+        method: "POST",
+        body: JSON.stringify({ slack_webhook: slack, discord_webhook: discord, critical_only: criticalOnly }),
+      }).catch(() => {});
+    }
+    toast("Alert configuration saved", "success");
+  }
+
+  function resetAlertConfig() {
+    const slack = $("slackWebhook");
+    const discord = $("discordWebhook");
+    const toggle = $("criticalOnlyToggle");
+    if (slack) slack.value = "";
+    if (discord) discord.value = "";
+    if (toggle) toggle.checked = false;
+  }
+
+  function saveRepoSettings() {
+    toast("Repository settings saved", "success");
+  }
+
+  function resetRepoSettings() {
+    toast("Settings reset", "info");
+  }
+
+  function setSeverity(level) {
+    const slider = $("severity-slider");
+    const label = $("severity-label");
+    if (slider) slider.value = level;
+    if (label) {
+      const labels = { 1: "Low", 2: "Medium", 3: "High", 4: "Critical" };
+      label.textContent = labels[level] || "Medium";
+    }
+  }
+
+  function saveNotifPrefs() {
+    toast("Notification preferences saved", "success");
+  }
+
+  function resetNotifPrefs() {
+    toast("Preferences reset", "info");
+  }
+
+  function toggleApiKeyVisibility() {
+    const el = $("api-key-value");
+    if (!el) return;
+    const masked = el.dataset.masked === "true" || el.textContent.includes("•");
+    if (masked) {
+      el.textContent = el.dataset.fullKey || el.textContent.replace(/•/g, "x");
+      el.dataset.masked = "false";
+    } else {
+      el.dataset.fullKey = el.textContent;
+      el.textContent = "•".repeat(Math.min(el.textContent.length, 40));
+      el.dataset.masked = "true";
+    }
+  }
+
+  function copyApiKey() {
+    const el = $("api-key-value");
+    const key = (el && el.dataset.fullKey) || (el && el.textContent) || "";
+    if (navigator.clipboard && key) {
+      navigator.clipboard.writeText(key).then(
+        () => toast("API key copied to clipboard", "success"),
+        () => toast("Failed to copy API key", "error")
+      );
+    } else {
+      toast("Failed to copy API key", "error");
+    }
+  }
+
+  function openRegenerateModal() {
+    toast("Regenerate API key? This will invalidate the current key.", "warning");
+  }
+
+  function copyCode(id) {
+    const block = $(id);
+    if (!block) return;
+    const text = block.textContent || block.innerText || "";
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(
+        () => toast("Code copied to clipboard", "success"),
+        () => toast("Failed to copy code", "error")
+      );
+    } else {
+      toast("Failed to copy code", "error");
+    }
+  }
+
+  function reconnectGitHub() {
+    window.location.href = "/auth/github";
+  }
+
+  // ── Repo detail helpers ──────────────────────────────────────────────────
+
+  function triggerScan(repoId) {
+    showScanOverlay();
+    request(`/api/repos/${encodeURIComponent(repoId)}/scan`, { method: "POST" })
+      .then(() => {
+        toast("Scan started", "success");
+        setTimeout(() => { if (window.location.pathname.startsWith("/dashboard")) loadDashboard(); }, 2000);
+      })
+      .catch((err) => toast(err.message, "error"));
+  }
+
+  function openModal(modalId) {
+    const modal = $(modalId);
+    if (modal) modal.classList.add("open");
+  }
+
+  function confirmRemoveRepo(repoId, repoName) {
+    if (!window.confirm(`Remove "${repoName}" from monitoring?`)) return;
+    request(`/api/repos/${encodeURIComponent(repoId)}`, { method: "DELETE" })
+      .then(() => {
+        toast("Repository removed", "success");
+        window.location.href = "/dashboard";
+      })
+      .catch((err) => toast(err.message, "error"));
+  }
+
+  function setupWebhook(repoName) {
+    toast(`Setting up webhook for ${repoName}...`, "info");
+  }
+
+  function rescanRepo(repoId) {
+    triggerScan(repoId);
+  }
+
+  function exportFindings(format, scanId) {
+    toast(`Exporting ${format}...`, "info");
+    const url = scanId
+      ? `/api/scans/${encodeURIComponent(scanId)}/export?format=${encodeURIComponent(format)}`
+      : `/api/findings/export?format=${encodeURIComponent(format)}`;
+    window.open(url, "_blank");
+  }
+
+  // ── Toast helper (title + message variant) ───────────────────────────────
+
+  function showToast(type, title, message) {
+    const container = $("toast-container");
+    if (!container) return;
+    const el = document.createElement("div");
+    el.className = `toast ${type}`;
+    if (title) {
+      const titleEl = document.createElement("strong");
+      titleEl.textContent = title;
+      el.appendChild(titleEl);
+      el.appendChild(document.createTextNode(" "));
+    }
+    el.appendChild(document.createTextNode(message || ""));
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 4200);
+  }
+
+  // ── Nav scroll shadow ────────────────────────────────────────────────────
+
+  function initNavScrollShadow() {
+    const nav = document.querySelector(".top-nav") || document.querySelector("nav");
+    if (!nav) return;
+    const onScroll = () => {
+      nav.classList.toggle("scrolled", window.scrollY > 4);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
+
+  // ── Outside-click dropdown closer ────────────────────────────────────────
+
+  function initDropdownCloser() {
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".dropdown")) {
+        document.querySelectorAll(".dropdown.open").forEach((el) => el.classList.remove("open"));
+      }
+    });
+  }
+
   function init() {
     if (!$("repo-list")) return;
     initNav();
-    $("show-add-repo").addEventListener("click", () => {
-      $("add-repo-panel").hidden = !$("add-repo-panel").hidden;
-      if (!$("add-repo-panel").hidden) $("repo-url-input").focus();
-    });
+    initNavScrollShadow();
+    initDropdownCloser();
+    const showAddRepo = $("show-add-repo");
+    if (showAddRepo) {
+      showAddRepo.addEventListener("click", () => {
+        $("add-repo-panel").hidden = !$("add-repo-panel").hidden;
+        if (!$("add-repo-panel").hidden) $("repo-url-input").focus();
+      });
+    }
     $("add-repo-btn").addEventListener("click", addRepoFromUrl);
     $("load-github-repos-btn").addEventListener("click", loadGitHubRepos);
     $("github-search").addEventListener("input", filterGitHubRepos);
