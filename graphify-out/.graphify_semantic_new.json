@@ -1,0 +1,669 @@
+{
+  "nodes": [
+    {
+      "id": "project_state_secrets_hygiene_monitor",
+      "label": "Secrets Hygiene Monitor",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_gitleaks_engine_decision",
+      "label": "Gitleaks Scanning Engine Decision",
+      "file_type": "rationale",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_fastapi_framework",
+      "label": "FastAPI Web Framework",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_sqlite_mvp_decision",
+      "label": "SQLite for MVP Decision",
+      "file_type": "rationale",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_github_oauth",
+      "label": "GitHub OAuth Authentication",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_background_scheduler",
+      "label": "Background Thread Scheduler Decision",
+      "file_type": "rationale",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_in_memory_session",
+      "label": "In-Memory Session Store Decision",
+      "file_type": "rationale",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_diff_alerting",
+      "label": "Diff-Based Alerting Strategy",
+      "file_type": "rationale",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_secrets_truncation",
+      "label": "Secrets Truncation to 30 Characters",
+      "file_type": "rationale",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_pydantic_v1",
+      "label": "Pydantic v1 Dependency Decision",
+      "file_type": "rationale",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_ssrf_cors_security",
+      "label": "SSRF and CORS Security Measures",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_webhook_hmac",
+      "label": "Webhook HMAC-SHA256 Verification",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_slack_discord_alerts",
+      "label": "Slack and Discord Alert Notifications",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_rate_limiting",
+      "label": "Rate Limiting 60 Requests per Minute",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "project_state_systemd_service",
+      "label": "Systemd Non-Root Service Deployment",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "quick_deploy_ubuntu_vps",
+      "label": "Ubuntu VPS Deploy Script",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/QUICK_DEPLOY.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "github_workflows_scan_daily_scanner",
+      "label": "Daily GitHub Actions Scan Workflow",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/.github/workflows/scan.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "readme_aspirational_aws_architecture",
+      "label": "Aspirational AWS Architecture (Lambda, DynamoDB, S3)",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "hermes_config_orchestrator_agent",
+      "label": "Hermes Orchestrator Agent",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/hermes/config.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "templates_dashboard_monitoring_ui",
+      "label": "Dashboard Monitoring UI",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/dashboard.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "templates_landing_connect_page",
+      "label": "Landing Page Connect UI",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/landing.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "templates_repo_detail_view",
+      "label": "Repository Detail View",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/repo_detail.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "templates_scan_results_view",
+      "label": "Scan Results Findings View",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/scan_results.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "templates_settings_page",
+      "label": "Settings Management Page",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/settings.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "templates_scan_results_scan_trigger_types",
+      "label": "Scan Trigger Types (Manual, Webhook, Scheduled)",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/scan_results.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "templates_scan_results_findings_severity",
+      "label": "Findings Severity Classification (Critical, High, Medium)",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/scan_results.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "templates_settings_alert_webhook_config",
+      "label": "Alert Webhook Configuration (Slack, Discord)",
+      "file_type": "concept",
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/settings.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "project_state_gitleaks_engine_decision",
+      "target": "project_state_secrets_hygiene_monitor",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_sqlite_mvp_decision",
+      "target": "project_state_secrets_hygiene_monitor",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_background_scheduler",
+      "target": "project_state_secrets_hygiene_monitor",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_in_memory_session",
+      "target": "project_state_secrets_hygiene_monitor",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_diff_alerting",
+      "target": "project_state_secrets_hygiene_monitor",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_truncation",
+      "target": "project_state_secrets_hygiene_monitor",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_pydantic_v1",
+      "target": "project_state_secrets_hygiene_monitor",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "project_state_fastapi_framework",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "project_state_github_oauth",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "project_state_ssrf_cors_security",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "project_state_webhook_hmac",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "project_state_slack_discord_alerts",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "project_state_rate_limiting",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "project_state_systemd_service",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "quick_deploy_ubuntu_vps",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/QUICK_DEPLOY.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "github_workflows_scan_daily_scanner",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/.github/workflows/scan.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "templates_dashboard_monitoring_ui",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/dashboard.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "templates_landing_connect_page",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/landing.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "templates_repo_detail_view",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/repo_detail.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "templates_scan_results_view",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/scan_results.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "templates_settings_page",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/settings.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_secrets_hygiene_monitor",
+      "target": "readme_aspirational_aws_architecture",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "templates_dashboard_monitoring_ui",
+      "target": "templates_landing_connect_page",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/dashboard.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "templates_dashboard_monitoring_ui",
+      "target": "templates_repo_detail_view",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/dashboard.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "templates_dashboard_monitoring_ui",
+      "target": "templates_scan_results_view",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/dashboard.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "templates_dashboard_monitoring_ui",
+      "target": "templates_settings_page",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/dashboard.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "templates_scan_results_view",
+      "target": "templates_scan_results_scan_trigger_types",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/scan_results.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "templates_scan_results_view",
+      "target": "templates_scan_results_findings_severity",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/scan_results.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "templates_settings_page",
+      "target": "templates_settings_alert_webhook_config",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/settings.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_github_oauth",
+      "target": "templates_landing_connect_page",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/landing.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_slack_discord_alerts",
+      "target": "templates_settings_alert_webhook_config",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/templates/settings.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "project_state_gitleaks_engine_decision",
+      "target": "github_workflows_scan_daily_scanner",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/.github/workflows/scan.yml",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "secrets_detection_and_alerting_pipeline",
+      "label": "Secrets Detection and Alerting Pipeline",
+      "nodes": [
+        "project_state_github_oauth",
+        "project_state_gitleaks_engine_decision",
+        "templates_scan_results_findings_severity",
+        "project_state_slack_discord_alerts"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md"
+    },
+    {
+      "id": "deployment_infrastructure_stack",
+      "label": "Deployment Infrastructure Stack",
+      "nodes": [
+        "project_state_fastapi_framework",
+        "project_state_sqlite_mvp_decision",
+        "project_state_systemd_service",
+        "quick_deploy_ubuntu_vps"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/QUICK_DEPLOY.md"
+    },
+    {
+      "id": "security_boundary_measures",
+      "label": "Security Boundary Measures",
+      "nodes": [
+        "project_state_ssrf_cors_security",
+        "project_state_webhook_hmac",
+        "project_state_rate_limiting",
+        "project_state_secrets_truncation"
+      ],
+      "relation": "implement",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/kaushik/Documents/GitHub/secrets-hygiene-monitor/PROJECT_STATE.md"
+    }
+  ],
+  "input_tokens": 40000,
+  "output_tokens": 75435
+}
